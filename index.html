@@ -6,399 +6,590 @@
 <title>苏络贪吃蛇 · 开放世界</title>
 <style>
   :root{
-    --paper:#f4efe4;
-    --paper-2:#ece4d4;
-    --ink:#2b2b2b;
-    --ink-soft:#5a5650;
-    --teal:#1f6f6b;
-    --teal-2:#2f9b95;
-    --accent:#c8702f;
-    --line:#d8cfbd;
+    --paper:#f3eee3; --paper-2:#eae1d0; --ink:#26262a; --ink-soft:#5d5850;
+    --teal:#1f6f6b; --teal-2:#2f9b95; --gold:#d9a441; --accent:#d2542a; --line:#d8cfbd;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;min-height:100%;}
-  body{
-    background:radial-gradient(circle at 50% 0%, #faf6ec 0%, var(--paper) 55%, var(--paper-2) 100%);
-    color:var(--ink);
-    font-family:"STKaiti","KaiTi","Kaiti SC","楷体",serif;
-    display:flex;flex-direction:column;align-items:center;
-    padding:10px 10px 24px;
-  }
-  h1{font-size:24px;letter-spacing:6px;margin:4px 0 1px;font-weight:700;}
-  .subtitle{font-size:12px;color:var(--ink-soft);letter-spacing:1px;margin-bottom:8px;text-align:center;}
-  .hud{display:flex;gap:16px;align-items:center;justify-content:center;font-size:14px;color:var(--ink-soft);margin-bottom:6px;}
-  .hud b{color:var(--teal);font-size:18px;margin-left:3px;font-family:inherit;}
-  .board{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:560px;margin-bottom:8px;}
-  .chip{font-size:12px;padding:3px 9px;border-radius:14px;background:#fff;border:1px solid var(--line);color:var(--ink-soft);white-space:nowrap;}
+  body{background:radial-gradient(circle at 50% 0%,#faf6ec 0%,var(--paper) 55%,var(--paper-2) 100%);
+    color:var(--ink);font-family:"STKaiti","KaiTi","Kaiti SC","楷体",serif;
+    display:flex;flex-direction:column;align-items:center;padding:8px 8px 20px;}
+  h1{font-size:22px;letter-spacing:5px;margin:2px 0 1px;font-weight:700;}
+  .subtitle{font-size:11px;color:var(--ink-soft);letter-spacing:1px;margin-bottom:6px;text-align:center;}
+  .hud{display:flex;gap:14px;align-items:center;justify-content:center;font-size:13px;color:var(--ink-soft);margin-bottom:5px;}
+  .hud b{color:var(--teal);font-size:17px;margin-left:3px;font-family:inherit;}
+  .toolbar{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}
+  .toolbar button{padding:4px 12px;font-size:12px;border-radius:14px;letter-spacing:1px;
+    background:linear-gradient(180deg,#fff,#efe7d6);color:var(--ink);border:1px solid var(--line);
+    box-shadow:0 2px 0 rgba(0,0,0,.08);}
+  .toolbar button.on{background:linear-gradient(180deg,var(--teal-2),var(--teal));color:#fff;border-color:var(--teal);}
+  .board{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:760px;margin-bottom:7px;}
+  .chip{font-size:11px;padding:2px 8px;border-radius:12px;background:#fff;border:1px solid var(--line);color:var(--ink-soft);white-space:nowrap;}
   .chip.me{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:700;}
+  .chip.dead{opacity:.45;text-decoration:line-through;}
   .chip .sc{font-weight:700;margin-left:3px;}
-  .stage{position:relative;width:min(94vw,560px);}
-  canvas#game{
-    width:100%;height:auto;aspect-ratio:1/1;display:block;background:var(--paper);
-    border:2px solid var(--line);border-radius:10px;
-    box-shadow:0 10px 28px rgba(60,50,30,.16), inset 0 0 0 6px rgba(255,255,255,.35);
-    touch-action:none;
-  }
-  canvas#mini{position:absolute;right:8px;bottom:8px;width:96px;height:96px;border-radius:8px;
-    border:1px solid var(--line);background:rgba(244,239,228,.82);box-shadow:0 3px 8px rgba(0,0,0,.18);}
+  .stage{position:relative;width:min(97vw,760px);}
+  canvas#game{width:100%;display:block;background:#f3eee3;border:2px solid var(--line);border-radius:10px;
+    box-shadow:0 10px 28px rgba(60,50,30,.16),inset 0 0 0 5px rgba(255,255,255,.3);touch-action:none;}
+  canvas#mini{position:absolute;right:7px;bottom:7px;width:88px;height:88px;border-radius:8px;
+    border:1px solid var(--line);background:rgba(243,238,227,.8);box-shadow:0 3px 8px rgba(0,0,0,.18);}
   .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:12px;text-align:center;background:rgba(244,239,228,.88);border-radius:10px;padding:18px;}
+    gap:11px;text-align:center;background:rgba(243,238,227,.9);border-radius:10px;padding:18px;}
   .overlay.hidden{display:none;}
-  .overlay h2{margin:0;font-size:22px;letter-spacing:3px;}
-  .overlay p{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.8;max-width:300px;}
-  .overlay .big{font-size:20px;color:var(--accent);}
-  button{font-family:inherit;cursor:pointer;border:none;border-radius:24px;padding:9px 22px;font-size:15px;
+  .overlay h2{margin:0;font-size:21px;letter-spacing:3px;}
+  .overlay p{margin:0;font-size:12.5px;color:var(--ink-soft);line-height:1.8;max-width:300px;}
+  .overlay .big{font-size:26px;color:var(--accent);}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:22px;padding:9px 22px;font-size:15px;
     letter-spacing:2px;color:#fff;background:linear-gradient(180deg,var(--teal-2),var(--teal));
-    box-shadow:0 4px 0 #14524f,0 6px 12px rgba(0,0,0,.15);transition:transform .06s,box-shadow .06s;}
-  button:active{transform:translateY(3px);box-shadow:0 1px 0 #14524f,0 3px 8px rgba(0,0,0,.15);}
-  .pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,58px);gap:8px;margin-top:14px;}
-  .pad button{padding:0;border-radius:12px;font-size:22px;box-shadow:0 3px 0 #14524f;background:linear-gradient(180deg,var(--teal-2),var(--teal));}
-  .pad .up{grid-column:2;grid-row:1;}
-  .pad .left{grid-column:1;grid-row:2;}
-  .pad .down{grid-column:2;grid-row:2;}
-  .pad .right{grid-column:3;grid-row:2;}
-  .pad .mid{grid-column:2;grid-row:3;background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 3px 0 #6f6248;font-size:13px;}
-  .hint{font-size:11px;color:var(--ink-soft);margin-top:12px;letter-spacing:1px;text-align:center;line-height:1.7;max-width:340px;}
-  .foot{margin-top:14px;font-size:11px;color:var(--ink-soft);letter-spacing:1px;}
-  @media (max-width:420px){ h1{font-size:21px;} .pad{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);} }
+    box-shadow:0 4px 0 #14524f,0 6px 12px rgba(0,0,0,.15);transition:transform .06s;}
+  button:active{transform:translateY(3px);}
+  .pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,58px);gap:7px;margin-top:12px;}
+  .pad button{padding:0;border-radius:12px;font-size:21px;box-shadow:0 3px 0 #14524f;
+    background:linear-gradient(180deg,var(--teal-2),var(--teal));}
+  .pad .up{grid-column:2;grid-row:1;} .pad .left{grid-column:1;grid-row:2;}
+  .pad .down{grid-column:2;grid-row:2;} .pad .right{grid-column:3;grid-row:2;}
+  .pad .mid{grid-column:2;grid-row:3;background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 3px 0 #6f6248;font-size:12px;}
+  .pad .boost{grid-column:3;grid-row:3;background:linear-gradient(180deg,#e08a4a,#c8702f);box-shadow:0 3px 0 #8a4a1c;font-size:13px;}
+  .pad .mode{grid-column:1;grid-row:3;background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 3px 0 #6f6248;font-size:11px;}
+  .hint{font-size:11px;color:var(--ink-soft);margin-top:10px;letter-spacing:1px;text-align:center;line-height:1.7;max-width:400px;}
+  .foot{margin-top:10px;font-size:11px;color:var(--ink-soft);letter-spacing:1px;}
+  body.fs{padding:0;justify-content:center;}
+  body.fs h1,body.fs .subtitle,body.fs .hud,body.fs .board,body.fs .toolbar,
+  body.fs .pad,body.fs .hint,body.fs .foot{display:none;}
+  body.fs .stage{width:100vmin;}
+  body.fs canvas#game{border:none;border-radius:0;box-shadow:none;}
+  @media (max-width:420px){ h1{font-size:19px;} .pad{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);} }
 </style>
 </head>
 <body>
   <h1>苏络贪吃蛇 · 开放世界</h1>
-  <div class="subtitle">大地图 · 多蛇竞争 · 不撞死 · 吃得越多越长</div>
+  <div class="subtitle">长度即分数 · 抢光点 · 撞身掉肉（可切大作战：撞身即死）</div>
 
   <div class="hud">
-    <div>得分 <b id="score">0</b></div>
-    <div>最高 <b id="best">0</b></div>
+    <div>长度 <b id="score">0</b></div>
+    <div>最长 <b id="best">0</b></div>
     <div>排名 <b id="rank">-</b></div>
   </div>
+
+  <div class="toolbar">
+    <button id="modeBtn" class="on">模式：开放世界</button>
+    <button id="fsBtn">全屏</button>
+  </div>
+
   <div class="board" id="board"></div>
 
   <div class="stage">
     <canvas id="game"></canvas>
-    <canvas id="mini" width="96" height="96"></canvas>
+    <canvas id="mini" width="88" height="88"></canvas>
     <div class="overlay" id="startOverlay">
       <h2>苏络 · 开放世界</h2>
-      <p>大地图里有多条「苏络」蛇在抢食。<br>你<b>不会撞死</b>——只管追着「苏」「络」吃，<br>和对手比谁更长！</p>
+      <p>吃<b>发光豆子</b>变长，长度就是分数。<br>
+         蛇身是一条「苏络苏络…」的字链，<br>
+         撞到别人的身体会<b>掉三节肉</b>变成豆子被抢。<br>
+         抢赢 6 条对手蛇，登顶排行榜。</p>
       <button id="startBtn">开始游走</button>
     </div>
     <div class="overlay hidden" id="pauseOverlay">
       <h2>已暂停</h2>
-      <p>当前得分 <span class="big" id="pauseScore">0</span></p>
+      <p>当前长度 <span class="big" id="pauseScore">0</span></p>
       <button id="resumeBtn">继续</button>
       <button id="restartBtn" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">重新开始</button>
     </div>
+    <div class="overlay hidden" id="deadOverlay">
+      <h2>被 <span id="killerName">对手</span> 撞死</h2>
+      <p>最终长度 <span class="big" id="finalScore">0</span><br>你的身体已散成豆子，被别人抢走了</p>
+      <button id="reviveBtn">重新开始</button>
+    </div>
   </div>
 
-  <div class="pad" aria-label="方向控制">
+  <div class="pad">
     <button class="up" data-dir="up">↑</button>
     <button class="left" data-dir="left">←</button>
     <button class="down" data-dir="down">↓</button>
     <button class="right" data-dir="right">→</button>
+    <button class="mode" id="padModeBtn">开放世界</button>
     <button class="mid" id="pauseBtn">暂停</button>
+    <button class="boost" id="boostBtn">加速</button>
   </div>
 
-  <div class="hint">方向键 / WASD / 滑动屏幕控制 · 空格暂停<br>相机始终跟随你 · 右下角为世界缩略图</div>
-  <div class="foot">苏络 · Su Luo Snake — 开放世界版</div>
+  <div class="hint">方向键 / WASD / 滑动屏幕移动 · <b>Shift 或 加速按钮</b>（消耗长度）· 空格暂停<br>
+    相机带「死区」跟随：你在中心区域走时地图不动，不再晃</div>
+  <div class="foot">苏络 · Su Luo Snake</div>
 
 <script>
 (function(){
-  "use strict";
-  // ===== 配置 =====
-  const WCOLS = 60, WROWS = 60;          // 大世界格子数
-  const VIEW = 23;                       // 视口格子数（奇数，玩家居中）
-  const CELL = 30;                       // 逻辑像素/格
-  const FOOD_TARGET = 110;               // 世界中常驻食物数量
-  const BOT_COUNT = 6;                   // 竞争对手数量
-  const STEP0 = 130;                     // 初始步长(ms)
+"use strict";
+/* ===== 配置 ===== */
+const WCOLS=64, WROWS=64;
+const FOOD_TARGET=130;
+const BOT_COUNT=6;
+const TICK=150, BOOST_TICK=88;
+const START_LEN=5;
+const DEAD_ZONE=2.0;
+const CAM_LERP=0.16;
+const BOT_DEFS=[
+  {name:"赤蛇",color:"#c0392b"},{name:"橙蛇",color:"#d98324"},{name:"碧蛇",color:"#27ae60"},
+  {name:"蓝蛇",color:"#2e86c1"},{name:"紫蛇",color:"#8e5bb5"},{name:"黛蛇",color:"#5d6d7e"}
+];
 
-  const canvas = document.getElementById("game");
-  const ctx = canvas.getContext("2d");
-  const mini = document.getElementById("mini");
-  const mctx = mini.getContext("2d");
-  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  const W = VIEW * CELL, H = VIEW * CELL;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.scale(dpr, dpr);
+/* ===== DOM ===== */
+const canvas=document.getElementById("game"), ctx=canvas.getContext("2d");
+const mini=document.getElementById("mini"), mctx=mini.getContext("2d");
+const dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+const scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"), rankEl=document.getElementById("rank");
+const boardEl=document.getElementById("board");
+const startOverlay=document.getElementById("startOverlay"), pauseOverlay=document.getElementById("pauseOverlay"), deadOverlay=document.getElementById("deadOverlay");
+const pauseScoreEl=document.getElementById("pauseScore"), finalScoreEl=document.getElementById("finalScore"), killerNameEl=document.getElementById("killerName");
 
-  const scoreEl = document.getElementById("score");
-  const bestEl = document.getElementById("best");
-  const rankEl = document.getElementById("rank");
-  const boardEl = document.getElementById("board");
-  const startOverlay = document.getElementById("startOverlay");
-  const pauseOverlay = document.getElementById("pauseOverlay");
-  const pauseScoreEl = document.getElementById("pauseScore");
+/* ===== 状态 ===== */
+let VIEW=21, CELL=30;
+let snakes=[], food=[], player=null;
+let mode="open";
+let running=false, paused=false;
+let camX=0, camY=0, camInit=false;
+let lastTick=0, alpha=0, tickMs=TICK, lastTime=0;
+let hitFlash=0;
+let best=parseInt(localStorage.getItem("suluo_best")||"0",10)||0;
+bestEl.textContent=best;
 
-  let world, snakes, food, score, best, stepMs, running, paused;
-  best = parseInt(localStorage.getItem("suluo_best") || "0", 10) || 0;
-  bestEl.textContent = best;
+/* ===== 工具 ===== */
+const clamp=function(v,a,b){return v<a?a:(v>b?b:v);};
+function rel(v,cam,n){ var d=(v-cam)%n; if(d>n/2)d-=n; if(d<-n/2)d+=n; return d; }
+function rnd(n){ return (Math.random()*n)|0; }
+function mkFood(x,y,value){ return {x:x,y:y,ch:Math.random()<0.5?"苏":"络",value:value||1}; }
 
-  const BOT_DEFS = [
-    {name:"赤蛇", color:"#c0392b"},
-    {name:"橙蛇", color:"#d98324"},
-    {name:"碧蛇", color:"#27ae60"},
-    {name:"蓝蛇", color:"#2e86c1"},
-    {name:"紫蛇", color:"#7d5ba6"},
-    {name:"黛蛇", color:"#566573"}
-  ];
+/* ===== 自适应画布 ===== */
+function resize(){
+  var cssW = canvas.clientWidth || 380;
+  VIEW = clamp(Math.round(cssW/26), 15, 30);
+  CELL = cssW / VIEW;
+  canvas.width = Math.round(cssW*dpr);
+  canvas.height = Math.round(cssW*dpr);
+  canvas.style.height = cssW+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener("resize", function(){ resize(); if(!running) draw(0); });
+window.addEventListener("orientationchange", function(){ setTimeout(resize,250); });
 
-  // 环绕距离（处理大地图边界）
-  function wdx(a,b,n){ let d=(b-a+n)%n; if(d>n/2) d-=n; return d; }
-
-  function randCell(){ return { x:(Math.random()*WCOLS)|0, y:(Math.random()*WROWS)|0 }; }
-
-  function occupiedSet(){ // 所有蛇身占用的格子
-    const s = new Set();
-    for(const sn of snakes) for(const c of sn.body) s.add(c.x+","+c.y);
-    return s;
+/* ===== 初始化 ===== */
+function occSet(){
+  var s={};
+  for(var i=0;i<snakes.length;i++){ var sn=snakes[i];
+    if(!sn.alive) continue;
+    for(var j=0;j<sn.body.length;j++) s[sn.body[j].x+","+sn.body[j].y]=1; }
+  return s;
+}
+function spawnFood(n){
+  var occ=occSet();
+  for(var i=0;i<n;i++){
+    var c,g=0;
+    do{ c={x:rnd(WCOLS),y:rnd(WROWS)}; g++; }while(occ[c.x+","+c.y]&&g<60);
+    occ[c.x+","+c.y]=1;
+    food.push(mkFood(c.x,c.y,1));
   }
+}
+function spawnSnake(o){
+  var h={x:rnd(WCOLS),y:rnd(WROWS)};
+  var d=o.dir||{x:1,y:0}, body=[];
+  for(var i=0;i<START_LEN;i++) body.push({x:(h.x-d.x*i+WCOLS)%WCOLS, y:(h.y-d.y*i+WROWS)%WROWS});
+  return {id:o.id,name:o.name,color:o.color,isPlayer:!!o.isPlayer,alive:true,
+    body:body, prev:body.map(function(c){return {x:c.x,y:c.y};}), dir:d, nextDir:d,
+    score:START_LEN, boosting:false, respawnAt:0, hitCd:0, bc:0};
+}
+function reset(){
+  food=[]; snakes=[];
+  player=spawnSnake({id:0,name:"你·苏络",color:"#1f6f6b",isPlayer:true});
+  snakes.push(player);
+  for(var i=0;i<BOT_COUNT;i++){ var d=BOT_DEFS[i]; snakes.push(spawnSnake({id:i+1,name:d.name,color:d.color})); }
+  camX=player.body[0].x; camY=player.body[0].y; camInit=true;
+  scoreEl.textContent=player.score; updateBoard(); spawnFood(FOOD_TARGET);
+}
 
-  function spawnFood(n){
-    const occ = occupiedSet();
-    for(let i=0;i<n;i++){
-      let c, guard=0;
-      do{ c = randCell(); guard++; }while(occ.has(c.x+","+c.y) && guard<50);
-      occ.add(c.x+","+c.y);
-      food.push({ x:c.x, y:c.y, ch: Math.random()<0.5?"苏":"络" });
+/* ===== AI ===== */
+function botThink(sn){
+  var h=sn.body[0], i;
+  var bestF=null, bestS=-1;
+  for(i=0;i<food.length;i++){
+    var f=food[i];
+    var dx=rel(f.x,h.x,WCOLS), dy=rel(f.y,h.y,WROWS);
+    var d=Math.sqrt(dx*dx+dy*dy)+1;
+    var sc=(f.value*4)/d;
+    if(sc>bestS){bestS=sc;bestF=f;}
+  }
+  var opts=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}].filter(function(o){return !(o.x===-sn.dir.x&&o.y===-sn.dir.y);});
+  var occ=occSet();
+  var pick=null, pd=-1e9;
+  for(i=0;i<opts.length;i++){
+    var o=opts[i];
+    var nx=(h.x+o.x+WCOLS)%WCOLS, ny=(h.y+o.y+WROWS)%WROWS;
+    var s2 = occ[nx+","+ny] ? -1000 : 0;
+    if(bestF){ var ex=rel(bestF.x,nx,WCOLS), ey=rel(bestF.y,ny,WROWS); s2 -= Math.sqrt(ex*ex+ey*ey); }
+    else s2 += Math.random();
+    if(s2>pd){pd=s2;pick=o;}
+  }
+  sn.nextDir=pick||opts[0];
+}
+
+/* ===== 大作战机制 ===== */
+function dropMeat(sn,n){
+  for(var i=0;i<n && sn.body.length>START_LEN;i++){
+    var t=sn.body.pop();
+    food.push(mkFood(t.x,t.y,3));
+  }
+  sn.score=sn.body.length;
+  if(sn.isPlayer){ scoreEl.textContent=sn.score; hitFlash=1; }
+}
+function killSnake(sn,killer){
+  for(var i=0;i<sn.body.length;i++) food.push(mkFood(sn.body[i].x,sn.body[i].y,3));
+  var finalLen=sn.body.length;
+  sn.alive=false; sn.body=[]; sn.prev=[]; sn.score=0;
+  sn.respawnAt = sn.isPlayer ? 0 : performance.now()+2500;
+  if(sn.isPlayer){
+    killerNameEl.textContent = killer?killer.name:"对手";
+    finalScoreEl.textContent = finalLen;
+    deadOverlay.classList.remove("hidden");
+    running=false;
+  }
+}
+function moveSnake(sn,now){
+  if(!sn.alive) return;
+  if(!sn.isPlayer) botThink(sn);
+  sn.dir=sn.nextDir;
+  var h=sn.body[0];
+  var nh={x:(h.x+sn.dir.x+WCOLS)%WCOLS, y:(h.y+sn.dir.y+WROWS)%WROWS};
+  var hit=null, i, j;
+  for(i=0;i<snakes.length;i++){
+    var o=snakes[i];
+    if(o===sn||!o.alive) continue;
+    for(j=0;j<o.body.length;j++){ if(o.body[j].x===nh.x&&o.body[j].y===nh.y){hit=o;break;} }
+    if(hit) break;
+  }
+  if(hit){
+    if(mode==="battle"){ killSnake(sn,hit); return; }
+    if(now-sn.hitCd>600){ dropMeat(sn,3); sn.hitCd=now; }
+    return;
+  }
+  sn.body.unshift(nh);
+  var ate=-1;
+  for(i=0;i<food.length;i++){ if(food[i].x===nh.x&&food[i].y===nh.y){ate=i;break;} }
+  if(ate>=0){
+    var f=food[ate]; food.splice(ate,1);
+    for(var k=1;k<f.value;k++){ var t=sn.body[sn.body.length-1]; sn.body.push({x:t.x,y:t.y}); }
+  } else {
+    sn.body.pop();
+  }
+  sn.score=sn.body.length;
+  if(sn.isPlayer){
+    scoreEl.textContent=sn.score;
+    if(sn.score>best){best=sn.score;bestEl.textContent=best;localStorage.setItem("suluo_best",String(best));}
+  }
+  if(sn.boosting && sn.body.length>START_LEN+2){
+    sn.bc=(sn.bc||0)+1;
+    if(sn.bc%5===0){
+      var tail=sn.body.pop();
+      food.push(mkFood(tail.x,tail.y,2));
+      sn.score=sn.body.length;
+      if(sn.isPlayer) scoreEl.textContent=sn.score;
     }
   }
-
-  function makeSnake(opts){
-    const c = randCell();
-    const len = 4;
-    const body = [];
-    const dir = opts.dir || {x:1,y:0};
-    for(let i=0;i<len;i++) body.push({ x:(c.x - dir.x*i + WCOLS)%WCOLS, y:(c.y - dir.y*i + WROWS)%WROWS });
-    return { id:opts.id, name:opts.name, color:opts.color, isPlayer:!!opts.isPlayer,
-             body, dir, nextDir:dir, score:0, blocked:false };
-  }
-
-  function reset(){
-    food = [];
-    snakes = [];
-    snakes.push(makeSnake({ id:0, name:"你·苏络", color:"#1f6f6b", isPlayer:true }));
-    for(let i=0;i<BOT_COUNT;i++){
-      const d = BOT_DEFS[i % BOT_DEFS.length];
-      snakes.push(makeSnake({ id:i+1, name:d.name, color:d.color }));
-    }
-    score = 0; stepMs = STEP0;
-    scoreEl.textContent = "0"; rankEl.textContent = "-";
-    spawnFood(FOOD_TARGET);
-  }
-
-  // ===== AI：朝最近食物走，不反向 =====
-  function botThink(sn){
-    let bestF = null, bestD = 1e9;
-    const h = sn.body[0];
-    for(const f of food){
-      const d = wdx(h.x,f.x,WCOLS)**2 + wdx(h.y,f.y,WROWS)**2;
-      if(d < bestD){ bestD = d; bestF = f; }
-    }
-    const opts = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}]
-      .filter(o => !(o.x === -sn.dir.x && o.y === -sn.dir.y));
-    if(!bestF){ sn.nextDir = opts[(Math.random()*opts.length)|0]; return; }
-    let pick = sn.dir, pd = 1e9;
-    for(const o of opts){
-      const nx = (h.x+o.x+WCOLS)%WCOLS, ny = (h.y+o.y+WROWS)%WROWS;
-      const d = wdx(nx,bestF.x,WCOLS)**2 + wdx(ny,bestF.y,WROWS)**2;
-      if(d < pd){ pd = d; pick = o; }
-    }
-    sn.nextDir = pick;
-  }
-
-  function step(){
-    for(const sn of snakes){
-      if(!sn.isPlayer) botThink(sn);
-      sn.dir = sn.nextDir;
-      const h = sn.body[0];
-      const nh = { x:(h.x+sn.dir.x+WCOLS)%WCOLS, y:(h.y+sn.dir.y+WROWS)%WROWS };
-      // 非致命：若目标格被别的蛇身占着，这一拍原地不动（不死亡）
-      let blocked = false;
-      for(const other of snakes){
-        if(other === sn) continue;
-        for(const c of other.body){ if(c.x===nh.x && c.y===nh.y){ blocked = true; break; } }
-        if(blocked) break;
+}
+function tick(now){
+  var i;
+  for(i=0;i<snakes.length;i++){
+    var sn=snakes[i];
+    if(!sn.alive){
+      if(sn.respawnAt && now>=sn.respawnAt && !sn.isPlayer){
+        snakes[i]=spawnSnake({id:sn.id,name:sn.name,color:sn.color});
       }
-      sn.blocked = blocked;
-      if(blocked) continue; // 不动，也不吃
-      sn.body.unshift(nh);
-      // 吃食物
-      let ate = -1;
-      for(let i=0;i<food.length;i++){
-        if(food[i].x===nh.x && food[i].y===nh.y){ ate = i; break; }
-      }
-      if(ate >= 0){
-        food.splice(ate,1);
-        sn.score++;
-        if(sn.isPlayer){
-          score = sn.score; scoreEl.textContent = score;
-          if(score > best){ best = score; bestEl.textContent = best; localStorage.setItem("suluo_best", String(best)); }
-          stepMs = Math.max(75, stepMs - 2);
-        }
-      } else {
-        sn.body.pop();
-      }
+      continue;
     }
-    // 补满食物
-    if(food.length < FOOD_TARGET) spawnFood(FOOD_TARGET - food.length);
-    updateBoard();
+    sn.prev=sn.body.map(function(c){return {x:c.x,y:c.y};});
   }
+  for(i=0;i<snakes.length;i++) moveSnake(snakes[i],now);
+  if(player && player.alive && player.boosting) moveSnake(player,now);
+  if(food.length<FOOD_TARGET) spawnFood(FOOD_TARGET-food.length);
+  updateBoard();
+}
 
-  // ===== 渲染 =====
-  function draw(){
-    const me = snakes[0];
-    const hc = me.body[0];
-    ctx.fillStyle = "#f4efe4"; ctx.fillRect(0,0,W,H);
-    // 网格
-    ctx.strokeStyle = "rgba(160,148,120,.16)"; ctx.lineWidth = 1;
-    for(let i=1;i<VIEW;i++){ ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,H);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(W,i*CELL);ctx.stroke(); }
+/* ===== 相机：死区 + 平滑跟随 ===== */
+function headInterp(sn){
+  var b=sn.body, p=sn.prev;
+  if(!b.length) return {x:camX,y:camY};
+  var p0 = p.length?p[0]:b[0];
+  return {x:p0.x+rel(b[0].x,p0.x,WCOLS)*alpha, y:p0.y+rel(b[0].y,p0.y,WROWS)*alpha};
+}
+function updateCam(){
+  if(!player) return;
+  var h=headInterp(player);
+  if(!camInit){camX=h.x;camY=h.y;camInit=true;return;}
+  var tx=camX, dx=rel(h.x,camX,WCOLS);
+  if(dx>DEAD_ZONE) tx=camX+(dx-DEAD_ZONE);
+  else if(dx<-DEAD_ZONE) tx=camX+(dx+DEAD_ZONE);
+  var ty=camY, dy=rel(h.y,camY,WROWS);
+  if(dy>DEAD_ZONE) ty=camY+(dy-DEAD_ZONE);
+  else if(dy<-DEAD_ZONE) ty=camY+(dy+DEAD_ZONE);
+  camX += (tx-camX)*CAM_LERP;
+  camY += (ty-camY)*CAM_LERP;
+}
 
-    const cx = (VIEW-1)/2;
-    // 食物（相对玩家）
-    ctx.font = (CELL-12)+"px 'STKaiti','KaiTi','楷体',serif";
+/* ===== 渲染 ===== */
+function sx(wx){ return ((VIEW-1)/2 + rel(wx,camX,WCOLS))*CELL; }
+function sy(wy){ return ((VIEW-1)/2 + rel(wy,camY,WROWS))*CELL; }
+
+function strokeSeg(arr,color,isPlayer){
+  var k;
+  if(arr.length<2){
+    ctx.strokeStyle="rgba(40,40,45,.9)"; ctx.lineWidth=CELL*0.80+3;
+    ctx.beginPath(); ctx.arc(arr[0].x,arr[0].y,CELL*0.40,0,6.2832); ctx.stroke();
+    ctx.fillStyle=color;
+    ctx.beginPath(); ctx.arc(arr[0].x,arr[0].y,CELL*0.36,0,6.2832); ctx.fill();
+    return;
+  }
+  ctx.lineCap="round"; ctx.lineJoin="round";
+  if(isPlayer){
+    ctx.strokeStyle="rgba(217,164,65,.95)"; ctx.lineWidth=CELL*0.86+4;
+    ctx.beginPath(); ctx.moveTo(arr[0].x,arr[0].y);
+    for(k=1;k<arr.length;k++) ctx.lineTo(arr[k].x,arr[k].y); ctx.stroke();
+  }
+  ctx.strokeStyle="rgba(38,38,42,.92)"; ctx.lineWidth=CELL*0.80+3;
+  ctx.beginPath(); ctx.moveTo(arr[0].x,arr[0].y);
+  for(k=1;k<arr.length;k++) ctx.lineTo(arr[k].x,arr[k].y); ctx.stroke();
+  ctx.strokeStyle=color; ctx.lineWidth=CELL*0.80;
+  ctx.beginPath(); ctx.moveTo(arr[0].x,arr[0].y);
+  for(k=1;k<arr.length;k++) ctx.lineTo(arr[k].x,arr[k].y); ctx.stroke();
+}
+
+function draw(a){
+  alpha=a;
+  var S=VIEW*CELL, i, k;
+  ctx.fillStyle="#f3eee3"; ctx.fillRect(0,0,S,S);
+  ctx.strokeStyle="rgba(150,138,112,.13)"; ctx.lineWidth=1;
+  var gx0=Math.floor(camX-(VIEW-1)/2), gy0=Math.floor(camY-(VIEW-1)/2);
+  for(i=-1;i<=VIEW+1;i++){
+    var X=sx(gx0+i); ctx.beginPath();ctx.moveTo(X,0);ctx.lineTo(X,S);ctx.stroke();
+    var Y=sy(gy0+i); ctx.beginPath();ctx.moveTo(0,Y);ctx.lineTo(S,Y);ctx.stroke();
+  }
+  // 食物：圆形发光豆
+  var pulse=0.5+0.5*Math.sin(Date.now()/260);
+  for(i=0;i<food.length;i++){
+    var f=food[i], FX=sx(f.x), FY=sy(f.y);
+    if(FX<-CELL||FY<-CELL||FX>S+CELL||FY>S+CELL) continue;
+    var r=(f.value>1?CELL*0.30:CELL*0.19);
+    if(f.value>2) r*= (1+0.12*pulse);
+    var g=ctx.createRadialGradient(FX-r*0.3,FY-r*0.35,r*0.15,FX,FY,r*1.6);
+    g.addColorStop(0,"#ffd9a8"); g.addColorStop(0.45,"#e8783a"); g.addColorStop(1,"rgba(210,84,42,0)");
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(FX,FY,r*1.6,0,6.2832); ctx.fill();
+    ctx.fillStyle="#c8451c";
+    ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=Math.max(1,CELL*0.045);
+    ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.stroke();
+    ctx.fillStyle="#fff8ec"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font=(r*1.05)+"px 'STKaiti','KaiTi','楷体',serif";
+    ctx.fillText(f.ch,FX,FY+0.5);
+  }
+  // 蛇
+  for(i=0;i<snakes.length;i++){
+    var sn=snakes[i];
+    if(!sn.alive||!sn.body.length) continue;
+    var pts=[];
+    for(k=0;k<sn.body.length;k++){
+      var c=sn.body[k], p=(k<sn.prev.length?sn.prev[k]:c);
+      var ix=p.x+rel(c.x,p.x,WCOLS)*alpha, iy=p.y+rel(c.y,p.y,WROWS)*alpha;
+      pts.push({x:sx(ix),y:sy(iy)});
+    }
+    var seg=[pts[0]];
+    for(k=1;k<pts.length;k++){
+      var d=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
+      if(d>CELL*1.8){ strokeSeg(seg,sn.color,sn.isPlayer); seg=[]; }
+      seg.push(pts[k]);
+    }
+    strokeSeg(seg,sn.color,sn.isPlayer);
+    // 身体文字
     ctx.textAlign="center"; ctx.textBaseline="middle";
-    for(const f of food){
-      const dx = wdx(hc.x, f.x, WCOLS), dy = wdx(hc.y, f.y, WROWS);
-      const vx = cx + dx, vy = cx + dy;
-      if(vx<-0.5||vy<-0.5||vx>VIEW-0.5||vy>VIEW-0.5) continue;
-      drawCell(vx, vy, f.ch, "#c8702f", "#f6e2cf", true, false);
+    ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',serif";
+    for(k=1;k<pts.length;k++){
+      var TX=pts[k].x, TY=pts[k].y;
+      if(TX<-CELL||TY<-CELL||TX>S+CELL||TY>S+CELL) continue;
+      ctx.fillStyle="rgba(255,255,255,.95)";
+      ctx.fillText(k%2===0?"苏":"络", TX, TY+0.5);
     }
-    // 蛇
-    for(const sn of snakes){
-      for(let i=sn.body.length-1;i>=0;i--){
-        const c = sn.body[i];
-        const dx = wdx(hc.x, c.x, WCOLS), dy = wdx(hc.y, c.y, WROWS);
-        const vx = cx + dx, vy = cx + dy;
-        if(vx<-0.5||vy<-0.5||vx>VIEW-0.5||vy>VIEW-0.5) continue;
-        const ch = (i%2===0)?"苏":"络";
-        if(i===0) drawCell(vx, vy, ch, sn.color, "#fff", true, true, sn.name);
-        else drawCell(vx, vy, ch, sn.color, tint(sn.color), false);
+    // 头
+    var H=pts[0];
+    if(H.x>-CELL&&H.y>-CELL&&H.x<S+CELL&&H.y<S+CELL){
+      ctx.fillStyle=sn.color;
+      ctx.strokeStyle=sn.isPlayer?"#d9a441":"rgba(38,38,42,.9)";
+      ctx.lineWidth=sn.isPlayer?3:2.4;
+      ctx.beginPath(); ctx.arc(H.x,H.y,CELL*0.44,0,6.2832); ctx.fill(); ctx.stroke();
+      var er=CELL*0.13, off=CELL*0.22;
+      var px=-sn.dir.y, py=sn.dir.x;
+      var fx=sn.dir.x*CELL*0.16, fy=sn.dir.y*CELL*0.16;
+      var sgns=[1,-1];
+      for(k=0;k<2;k++){
+        var ex=H.x+fx+px*sgns[k]*off, ey=H.y+fy+py*sgns[k]*off;
+        ctx.fillStyle="#fff";
+        ctx.beginPath(); ctx.arc(ex,ey,er,0,6.2832); ctx.fill();
+        ctx.fillStyle="#20202a";
+        ctx.beginPath(); ctx.arc(ex+sn.dir.x*er*0.35, ey+sn.dir.y*er*0.35, er*0.5,0,6.2832); ctx.fill();
       }
-    }
-    drawMini(me);
-  }
-
-  function tint(hex){
-    // 蛇身底色：用蛇色淡化
-    const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-    return `rgba(${r},${g},${b},0.16)`;
-  }
-
-  function drawCell(vx, vy, ch, ink, bg, warm, isHead, label){
-    const x = vx*CELL, y = vy*CELL, pad = 3;
-    ctx.fillStyle = bg;
-    roundRect(x+pad, y+pad, CELL-pad*2, CELL-pad*2, isHead?9:7); ctx.fill();
-    if(isHead){ ctx.strokeStyle = ink; ctx.lineWidth = 2.5;
-      roundRect(x+pad, y+pad, CELL-pad*2, CELL-pad*2, 9); ctx.stroke(); }
-    ctx.fillStyle = ink;
-    ctx.font = (isHead?(CELL-8):(CELL-12))+"px 'STKaiti','KaiTi','楷体',serif";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText(ch, x+CELL/2, y+CELL/2+1);
-    if(label){
-      ctx.fillStyle = ink; ctx.font = "11px sans-serif";
-      ctx.fillText(label, x+CELL/2, y+1);
+      ctx.font="10px sans-serif"; ctx.textAlign="center";
+      ctx.fillStyle=sn.isPlayer?"#1f6f6b":"rgba(70,66,60,.85)";
+      ctx.fillText(sn.name, H.x, H.y-CELL*0.52);
     }
   }
+  if(hitFlash>0){ ctx.fillStyle="rgba(200,50,30,"+(0.30*hitFlash)+")"; ctx.fillRect(0,0,S,S); }
+  drawMini();
+}
 
-  function roundRect(x,y,w,h,r){
-    ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+function drawMini(){
+  var S=88, mx=S/WCOLS, my=S/WROWS, i, j;
+  mctx.clearRect(0,0,S,S);
+  mctx.fillStyle="rgba(243,238,227,.85)"; mctx.fillRect(0,0,S,S);
+  mctx.fillStyle="#d2542a";
+  for(i=0;i<food.length;i++) mctx.fillRect(food[i].x*mx,food[i].y*my,1.3,1.3);
+  for(i=0;i<snakes.length;i++){
+    var sn=snakes[i]; if(!sn.alive) continue;
+    mctx.fillStyle=sn.color;
+    for(j=0;j<sn.body.length;j++) mctx.fillRect(sn.body[j].x*mx,sn.body[j].y*my,2,2);
   }
+  if(player&&player.alive){
+    mctx.fillStyle="#1f6f6b";
+    mctx.fillRect(player.body[0].x*mx-1.5, player.body[0].y*my-1.5, 4.5,4.5);
+  }
+  mctx.strokeStyle="rgba(38,38,42,.45)"; mctx.lineWidth=1;
+  var vx=((camX-(VIEW-1)/2)%WCOLS+WCOLS)%WCOLS, vy=((camY-(VIEW-1)/2)%WROWS+WROWS)%WROWS;
+  mctx.strokeRect(vx*mx,vy*my,VIEW*mx,VIEW*my);
+}
 
-  function drawMini(me){
-    const S = 96, sx = S/WCOLS, sy = S/WROWS;
-    mctx.clearRect(0,0,S,S);
-    mctx.fillStyle = "rgba(244,239,228,.9)"; mctx.fillRect(0,0,S,S);
-    // 食物
-    mctx.fillStyle = "#c8702f";
-    for(const f of food) mctx.fillRect(f.x*sx, f.y*sy, 1.4, 1.4);
-    // 蛇
-    for(const sn of snakes){
-      mctx.fillStyle = sn.color;
-      for(const c of sn.body) mctx.fillRect(c.x*sx, c.y*sy, 2, 2);
-    }
-    mctx.fillStyle = "#1f6f6b";
-    const h = me.body[0]; mctx.fillRect(h.x*sx-1, h.y*sy-1, 4, 4);
-    // 视口框
-    const vx = (h.x - (VIEW-1)/2 + WCOLS)%WCOLS, vy = (h.y - (VIEW-1)/2 + WROWS)%WROWS;
-    mctx.strokeStyle = "rgba(43,43,43,.5)"; mctx.lineWidth=1;
-    mctx.strokeRect((vx*sx+S)%S, (vy*sy+S)%S, VIEW*sx, VIEW*sy);
+/* ===== 排行榜 ===== */
+function updateBoard(){
+  if(!snakes.length) return;
+  var sorted=snakes.slice().sort(function(a,b){return b.score-a.score;});
+  rankEl.textContent=(sorted.indexOf(player)+1)+"/"+snakes.length;
+  boardEl.innerHTML="";
+  var medals=["①","②","③","④","⑤","⑥","⑦"];
+  for(var i=0;i<sorted.length;i++){
+    var sn=sorted[i];
+    var c=document.createElement("div");
+    c.className="chip"+(sn.isPlayer?" me":"")+(sn.alive?"":" dead");
+    c.innerHTML=(medals[i]||(i+1)+".")+sn.name+"<span class='sc'>"+sn.score+"</span>";
+    boardEl.appendChild(c);
   }
+}
 
-  // ===== 排行榜 =====
-  function updateBoard(){
-    const sorted = snakes.slice().sort((a,b)=>b.score-a.score);
-    let myRank = sorted.indexOf(snakes[0]) + 1;
-    rankEl.textContent = myRank + "/" + snakes.length;
-    boardEl.innerHTML = "";
-    sorted.forEach((sn,i)=>{
-      const c = document.createElement("div");
-      c.className = "chip" + (sn.isPlayer?" me":"");
-      const medal = ["①","②","③","④","⑤","⑥","⑦"][i] || (i+1)+".";
-      c.innerHTML = medal + sn.name + "<span class='sc'>"+sn.score+"</span>";
-      boardEl.appendChild(c);
-    });
+/* ===== 主循环 ===== */
+function frame(now){
+  requestAnimationFrame(frame);
+  var dt=Math.min(64, now-lastTime); lastTime=now;
+  if(running&&!paused){
+    tickMs = (player&&player.alive&&player.boosting)?BOOST_TICK:TICK;
+    var guard=0;
+    while(now-lastTick>=tickMs && guard++<4){ lastTick+=tickMs; tick(now); }
+    alpha=clamp((now-lastTick)/tickMs,0,1);
+    if(hitFlash>0) hitFlash=Math.max(0,hitFlash-dt/420);
+    updateCam();
+    draw(alpha);
+  } else if(snakes.length){
+    draw(alpha);
   }
+}
 
-  // ===== 主循环 =====
-  let timer=null;
-  function loop(){
-    if(running && !paused){
-      step();
-      draw();
-    }
-    timer = setTimeout(loop, stepMs);
-  }
-
-  // ===== 控制 =====
-  function setDir(nx,ny){
-    const sn = snakes && snakes[0]; if(!sn) return;
-    if(sn.dir.x === -nx && sn.dir.y === -ny) return;
-    sn.nextDir = {x:nx,y:ny};
-  }
-  window.addEventListener("keydown", function(e){
-    const k = e.key.toLowerCase();
-    if(k==="arrowup"||k==="w"){ setDir(0,-1); e.preventDefault(); }
-    else if(k==="arrowdown"||k==="s"){ setDir(0,1); e.preventDefault(); }
-    else if(k==="arrowleft"||k==="a"){ setDir(-1,0); e.preventDefault(); }
-    else if(k==="arrowright"||k==="d"){ setDir(1,0); e.preventDefault(); }
-    else if(k===" "){ togglePause(); e.preventDefault(); }
-  });
-  document.querySelectorAll(".pad button[data-dir]").forEach(b=>{
-    b.addEventListener("click", ()=>{ const d=b.getAttribute("data-dir");
+/* ===== 控制 ===== */
+function setDir(nx,ny){
+  if(!player||!player.alive) return;
+  if(player.dir.x===-nx&&player.dir.y===-ny) return;
+  player.nextDir={x:nx,y:ny};
+}
+window.addEventListener("keydown",function(e){
+  var k=e.key.toLowerCase();
+  if(k==="arrowup"||k==="w"){setDir(0,-1);e.preventDefault();}
+  else if(k==="arrowdown"||k==="s"){setDir(0,1);e.preventDefault();}
+  else if(k==="arrowleft"||k==="a"){setDir(-1,0);e.preventDefault();}
+  else if(k==="arrowright"||k==="d"){setDir(1,0);e.preventDefault();}
+  else if(k===" "){togglePause();e.preventDefault();}
+  else if(k==="shift"){ if(player) player.boosting=true; }
+});
+window.addEventListener("keyup",function(e){
+  if(e.key.toLowerCase()==="shift" && player) player.boosting=false;
+});
+var dirBtns=document.querySelectorAll(".pad button[data-dir]");
+for(var i=0;i<dirBtns.length;i++){
+  (function(b){
+    b.addEventListener("click",function(){
+      var d=b.getAttribute("data-dir");
       if(d==="up")setDir(0,-1); else if(d==="down")setDir(0,1);
-      else if(d==="left")setDir(-1,0); else if(d==="right")setDir(1,0); });
-  });
-  document.getElementById("pauseBtn").addEventListener("click", togglePause);
-  let tsx=0,tsy=0;
-  canvas.addEventListener("touchstart", e=>{ const t=e.touches[0]; tsx=t.clientX; tsy=t.clientY; }, {passive:true});
-  canvas.addEventListener("touchend", e=>{
-    const t=e.changedTouches[0]; const dx=t.clientX-tsx, dy=t.clientY-tsy;
-    if(Math.abs(dx)<16 && Math.abs(dy)<16) return;
+      else if(d==="left")setDir(-1,0); else if(d==="right")setDir(1,0);
+    });
+  })(dirBtns[i]);
+}
+var boostBtn=document.getElementById("boostBtn");
+function startBoost(e){ if(e)e.preventDefault(); if(player)player.boosting=true; }
+function endBoost(e){ if(e)e.preventDefault(); if(player)player.boosting=false; }
+boostBtn.addEventListener("touchstart",startBoost,{passive:false});
+boostBtn.addEventListener("touchend",endBoost,{passive:false});
+boostBtn.addEventListener("touchcancel",endBoost,{passive:false});
+boostBtn.addEventListener("mousedown",startBoost);
+boostBtn.addEventListener("mouseup",endBoost);
+boostBtn.addEventListener("mouseleave",endBoost);
+
+var tsx=0, tsy=0, lastMove=0;
+canvas.addEventListener("touchstart",function(e){ tsx=e.touches[0].clientX; tsy=e.touches[0].clientY; },{passive:true});
+canvas.addEventListener("touchmove",function(e){
+  var t=e.touches[0], dx=t.clientX-tsx, dy=t.clientY-tsy;
+  var now=performance.now();
+  if((Math.abs(dx)>26||Math.abs(dy)>26) && now-lastMove>90){
     if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?1:-1,0); else setDir(0,dy>0?1:-1);
-  }, {passive:true});
-
-  function togglePause(){
-    if(!running) return;
-    paused = !paused;
-    document.getElementById("pauseBtn").textContent = paused?"继续":"暂停";
-    if(paused){ pauseScoreEl.textContent = score; pauseOverlay.classList.remove("hidden"); }
-    else pauseOverlay.classList.add("hidden");
+    tsx=t.clientX; tsy=t.clientY; lastMove=now;
   }
-  function startGame(){
-    reset(); running=true; paused=false;
-    document.getElementById("pauseBtn").textContent="暂停";
-    startOverlay.classList.add("hidden"); pauseOverlay.classList.add("hidden");
-    updateBoard(); draw();
-  }
-  document.getElementById("startBtn").addEventListener("click", startGame);
-  document.getElementById("resumeBtn").addEventListener("click", togglePause);
-  document.getElementById("restartBtn").addEventListener("click", startGame);
+},{passive:true});
 
-  // 初始静态画面
-  reset(); running=false; draw(); updateBoard();
-  loop();
+function togglePause(){
+  if(!running) return;
+  paused=!paused;
+  document.getElementById("pauseBtn").textContent=paused?"继续":"暂停";
+  if(paused){ pauseScoreEl.textContent=player.score; pauseOverlay.classList.remove("hidden"); }
+  else { pauseOverlay.classList.add("hidden"); lastTick=performance.now(); }
+}
+function startGame(){
+  reset(); running=true; paused=false; camInit=false; hitFlash=0;
+  lastTick=performance.now(); lastTime=lastTick; alpha=0;
+  document.getElementById("pauseBtn").textContent="暂停";
+  startOverlay.classList.add("hidden"); pauseOverlay.classList.add("hidden"); deadOverlay.classList.add("hidden");
+  updateBoard(); resize(); draw(0);
+}
+document.getElementById("startBtn").addEventListener("click",startGame);
+document.getElementById("resumeBtn").addEventListener("click",togglePause);
+document.getElementById("restartBtn").addEventListener("click",startGame);
+document.getElementById("reviveBtn").addEventListener("click",startGame);
+
+function setMode(m){
+  mode=m;
+  var b1=document.getElementById("modeBtn"), b2=document.getElementById("padModeBtn");
+  b1.textContent = m==="open" ? "模式：开放世界" : "模式：大作战";
+  b2.textContent = m==="open" ? "开放世界" : "大作战";
+  if(m==="open"){ b1.className="on"; b1.style.background=""; b1.style.color=""; }
+  else { b1.className=""; b1.style.background="linear-gradient(180deg,#e08a4a,#c8702f)"; b1.style.color="#fff"; }
+}
+document.getElementById("modeBtn").addEventListener("click",function(){ setMode(mode==="open"?"battle":"open"); });
+document.getElementById("padModeBtn").addEventListener("click",function(){ setMode(mode==="open"?"battle":"open"); });
+
+document.getElementById("fsBtn").addEventListener("click",function(){
+  if(!document.fullscreenElement){
+    if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    document.body.classList.add("fs");
+  } else {
+    if(document.exitFullscreen) document.exitFullscreen();
+    document.body.classList.remove("fs");
+  }
+  setTimeout(function(){ resize(); if(!running) draw(0); },350);
+});
+document.addEventListener("fullscreenchange",function(){
+  document.body.classList.toggle("fs", !!document.fullscreenElement);
+  setTimeout(resize,300);
+});
+
+resize(); reset(); setMode("open"); lastTime=performance.now(); draw(0);
+requestAnimationFrame(frame);
 })();
 </script>
 </body>
