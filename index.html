@@ -53,6 +53,20 @@
   .pad .mode{grid-column:1;grid-row:3;background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 3px 0 #6f6248;font-size:11px;}
   .hint{font-size:11px;color:var(--ink-soft);margin-top:10px;letter-spacing:1px;text-align:center;line-height:1.7;max-width:400px;}
   .foot{margin-top:10px;font-size:11px;color:var(--ink-soft);letter-spacing:1px;}
+  #fsFloatBtn{position:absolute;left:8px;top:8px;padding:5px 12px;font-size:12px;border-radius:14px;
+    background:rgba(255,255,255,.88);color:var(--ink);border:1px solid var(--line);
+    box-shadow:0 2px 6px rgba(0,0,0,.18);letter-spacing:1px;}
+  /* 虚拟摇杆：画布任意位置按下即出现 */
+  #stick{position:absolute;width:112px;height:112px;border-radius:50%;pointer-events:none;
+    background:rgba(255,255,255,.28);border:2px solid rgba(31,111,107,.45);
+    transform:translate(-50%,-50%);display:none;}
+  #stick.on{display:block;}
+  #stickKnob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;
+    border-radius:50%;background:rgba(31,111,107,.8);box-shadow:0 2px 6px rgba(0,0,0,.25);}
+  /* 触摸设备：隐藏方向键盘，只留功能按钮 */
+  body.touch .pad{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:12px;}
+  body.touch .pad .up,body.touch .pad .left,
+  body.touch .pad .down,body.touch .pad .right{display:none;}
   body.fs{padding:0;justify-content:center;}
   body.fs h1,body.fs .subtitle,body.fs .hud,body.fs .board,body.fs .toolbar,
   body.fs .pad,body.fs .hint,body.fs .foot{display:none;}
@@ -81,12 +95,14 @@
   <div class="stage">
     <canvas id="game"></canvas>
     <canvas id="mini" width="88" height="88"></canvas>
+    <button id="fsFloatBtn">全屏</button>
+    <div id="stick"><div id="stickKnob"></div></div>
     <div class="overlay" id="startOverlay">
       <h2>苏络 · 开放世界</h2>
       <p>吃<b>发光豆子</b>变长，长度就是分数。<br>
          蛇身是一条「苏络苏络…」的字链，<br>
-         撞到别人的身体会<b>掉三节肉</b>变成豆子被抢。<br>
-         抢赢 6 条对手蛇，登顶排行榜。</p>
+         撞到对手只<b>掉三节肉</b>（不会死），肉会变成豆子被抢。<br>
+         <b>手机：画面任意位置按住拖动即可转向，双击画面全屏</b></p>
       <button id="startBtn">开始游走</button>
     </div>
     <div class="overlay hidden" id="pauseOverlay">
@@ -112,8 +128,9 @@
     <button class="boost" id="boostBtn">加速</button>
   </div>
 
-  <div class="hint">方向键 / WASD / 滑动屏幕移动 · <b>Shift 或 加速按钮</b>（消耗长度）· 空格暂停<br>
-    相机带「死区」跟随：你在中心区域走时地图不动，不再晃</div>
+  <div class="hint"><b>手机：在画面任意位置按住拖动 = 虚拟摇杆</b>；双击画面可全屏<br>
+    电脑：方向键 / WASD / 鼠标拖动 · Shift 或「加速」按钮（消耗长度）· 空格暂停<br>
+    撞到对手只是掉肉，不会死；相机带死区跟随，不再晃</div>
   <div class="foot">苏络 · Su Luo Snake</div>
 
 <script>
@@ -121,12 +138,20 @@
 "use strict";
 /* ===== 配置 ===== */
 const WCOLS=64, WROWS=64;
-const FOOD_TARGET=130;
+const FOOD_TARGET=170;      // 常驻豆子更多，随处有得吃
 const BOT_COUNT=6;
 const TICK=150, BOOST_TICK=88;
-const START_LEN=5;
+const START_LEN=8;          // 玩家起步更长
 const DEAD_ZONE=2.0;
 const CAM_LERP=0.16;
+/* —— 爽点参数：不死亡，只掉肉（保持原样）—— */
+const DROP_MEAT=3;          // 撞到别人掉几节肉（不致命）
+const HIT_CD=600;           // 掉肉冷却，避免连掉
+/* —— AI 变笨：半速 + 迟钝 + 近视 + 失误 —— */
+const BOT_SKIP=2;           // 对手每 2 拍才走一步（半速）
+const BOT_DECIDE=4;         // 每 4 拍才重新决策一次，其余时间直行
+const BOT_SIGHT=12;         // 只看得见 12 格内的豆子
+const BOT_MISS=0.07;        // 7% 概率乱转
 const BOT_DEFS=[
   {name:"赤蛇",color:"#c0392b"},{name:"橙蛇",color:"#d98324"},{name:"碧蛇",color:"#27ae60"},
   {name:"蓝蛇",color:"#2e86c1"},{name:"紫蛇",color:"#8e5bb5"},{name:"黛蛇",color:"#5d6d7e"}
@@ -148,7 +173,9 @@ let mode="open";
 let running=false, paused=false;
 let camX=0, camY=0, camInit=false;
 let lastTick=0, alpha=0, tickMs=TICK, lastTime=0;
+const BOT_START_LEN=5;      // 对手起步比玩家短
 let hitFlash=0;
+let tickCount=0;            // 用于对手节流
 let best=parseInt(localStorage.getItem("suluo_best")||"0",10)||0;
 bestEl.textContent=best;
 
@@ -161,7 +188,7 @@ function mkFood(x,y,value){ return {x:x,y:y,ch:Math.random()<0.5?"苏":"络",val
 /* ===== 自适应画布 ===== */
 function resize(){
   var cssW = canvas.clientWidth || 380;
-  VIEW = clamp(Math.round(cssW/26), 15, 30);
+  VIEW = clamp(Math.round(cssW/30), 13, 26);   // 每格更大 → 豆子里的字看得清
   CELL = cssW / VIEW;
   canvas.width = Math.round(cssW*dpr);
   canvas.height = Math.round(cssW*dpr);
@@ -189,34 +216,42 @@ function spawnFood(n){
   }
 }
 function spawnSnake(o){
+  var len=o.len||START_LEN;
   var h={x:rnd(WCOLS),y:rnd(WROWS)};
   var d=o.dir||{x:1,y:0}, body=[];
-  for(var i=0;i<START_LEN;i++) body.push({x:(h.x-d.x*i+WCOLS)%WCOLS, y:(h.y-d.y*i+WROWS)%WROWS});
+  for(var i=0;i<len;i++) body.push({x:(h.x-d.x*i+WCOLS)%WCOLS, y:(h.y-d.y*i+WROWS)%WROWS});
   return {id:o.id,name:o.name,color:o.color,isPlayer:!!o.isPlayer,alive:true,
     body:body, prev:body.map(function(c){return {x:c.x,y:c.y};}), dir:d, nextDir:d,
-    score:START_LEN, boosting:false, respawnAt:0, hitCd:0, bc:0};
+    score:len, boosting:false, respawnAt:0, hitCd:0, bc:0};
 }
 function reset(){
-  food=[]; snakes=[];
+  food=[]; snakes=[]; tickCount=0;
   player=spawnSnake({id:0,name:"你·苏络",color:"#1f6f6b",isPlayer:true});
   snakes.push(player);
-  for(var i=0;i<BOT_COUNT;i++){ var d=BOT_DEFS[i]; snakes.push(spawnSnake({id:i+1,name:d.name,color:d.color})); }
+  for(var i=0;i<BOT_COUNT;i++){ var d=BOT_DEFS[i];
+    snakes.push(spawnSnake({id:i+1,name:d.name,color:d.color,len:BOT_START_LEN})); }
   camX=player.body[0].x; camY=player.body[0].y; camInit=true;
   scoreEl.textContent=player.score; updateBoard(); spawnFood(FOOD_TARGET);
 }
 
 /* ===== AI ===== */
 function botThink(sn){
+  // 迟钝：每 BOT_DECIDE 拍才重新想一次，其余时间直行（会错过转弯、绕远路）
+  if(tickCount % BOT_DECIDE !== 0) return;
   var h=sn.body[0], i;
   var bestF=null, bestS=-1;
   for(i=0;i<food.length;i++){
     var f=food[i];
     var dx=rel(f.x,h.x,WCOLS), dy=rel(f.y,h.y,WROWS);
     var d=Math.sqrt(dx*dx+dy*dy)+1;
+    if(d>BOT_SIGHT) continue;          // 近视：看不见远处的豆子
     var sc=(f.value*4)/d;
     if(sc>bestS){bestS=sc;bestF=f;}
   }
-  var opts=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}].filter(function(o){return !(o.x===-sn.dir.x&&o.y===-sn.dir.y);});
+  var all=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+  var opts=all.filter(function(o){return !(o.x===-sn.dir.x&&o.y===-sn.dir.y);});
+  // 失误：小概率乱转，不再精准追豆
+  if(Math.random()<BOT_MISS){ sn.nextDir=opts[rnd(opts.length)]; return; }
   var occ=occSet();
   var pick=null, pd=-1e9;
   for(i=0;i<opts.length;i++){
@@ -253,7 +288,10 @@ function killSnake(sn,killer){
 }
 function moveSnake(sn,now){
   if(!sn.alive) return;
-  if(!sn.isPlayer) botThink(sn);
+  if(!sn.isPlayer){
+    if(tickCount % BOT_SKIP !== 0) return;   // 半速：对手每 2 拍才走一步，你比它们快一倍
+    botThink(sn);
+  }
   sn.dir=sn.nextDir;
   var h=sn.body[0];
   var nh={x:(h.x+sn.dir.x+WCOLS)%WCOLS, y:(h.y+sn.dir.y+WROWS)%WROWS};
@@ -266,7 +304,7 @@ function moveSnake(sn,now){
   }
   if(hit){
     if(mode==="battle"){ killSnake(sn,hit); return; }
-    if(now-sn.hitCd>600){ dropMeat(sn,3); sn.hitCd=now; }
+    if(now-sn.hitCd>HIT_CD){ dropMeat(sn,DROP_MEAT); sn.hitCd=now; }
     return;
   }
   sn.body.unshift(nh);
@@ -295,11 +333,12 @@ function moveSnake(sn,now){
 }
 function tick(now){
   var i;
+  tickCount++;
   for(i=0;i<snakes.length;i++){
     var sn=snakes[i];
     if(!sn.alive){
       if(sn.respawnAt && now>=sn.respawnAt && !sn.isPlayer){
-        snakes[i]=spawnSnake({id:sn.id,name:sn.name,color:sn.color});
+        snakes[i]=spawnSnake({id:sn.id,name:sn.name,color:sn.color,len:BOT_START_LEN});
       }
       continue;
     }
@@ -374,7 +413,7 @@ function draw(a){
   for(i=0;i<food.length;i++){
     var f=food[i], FX=sx(f.x), FY=sy(f.y);
     if(FX<-CELL||FY<-CELL||FX>S+CELL||FY>S+CELL) continue;
-    var r=(f.value>1?CELL*0.30:CELL*0.19);
+    var r=(f.value>1?CELL*0.44:CELL*0.32);   // 豆子整体放大，字才看得清
     if(f.value>2) r*= (1+0.12*pulse);
     var g=ctx.createRadialGradient(FX-r*0.3,FY-r*0.35,r*0.15,FX,FY,r*1.6);
     g.addColorStop(0,"#ffd9a8"); g.addColorStop(0.45,"#e8783a"); g.addColorStop(1,"rgba(210,84,42,0)");
@@ -384,8 +423,8 @@ function draw(a){
     ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.fill();
     ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=Math.max(1,CELL*0.045);
     ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.stroke();
-    ctx.fillStyle="#fff8ec"; ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.font=(r*1.05)+"px 'STKaiti','KaiTi','楷体',serif";
+    ctx.fillStyle="#fffaf0"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="bold "+Math.max(13,r*1.30)+"px 'STKaiti','KaiTi','楷体',serif";
     ctx.fillText(f.ch,FX,FY+0.5);
   }
   // 蛇
@@ -532,16 +571,57 @@ boostBtn.addEventListener("mousedown",startBoost);
 boostBtn.addEventListener("mouseup",endBoost);
 boostBtn.addEventListener("mouseleave",endBoost);
 
-var tsx=0, tsy=0, lastMove=0;
-canvas.addEventListener("touchstart",function(e){ tsx=e.touches[0].clientX; tsy=e.touches[0].clientY; },{passive:true});
-canvas.addEventListener("touchmove",function(e){
-  var t=e.touches[0], dx=t.clientX-tsx, dy=t.clientY-tsy;
-  var now=performance.now();
-  if((Math.abs(dx)>26||Math.abs(dy)>26) && now-lastMove>90){
-    if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?1:-1,0); else setDir(0,dy>0?1:-1);
-    tsx=t.clientX; tsy=t.clientY; lastMove=now;
-  }
+/* ===== 虚拟摇杆：画布上任意位置按下即出现 ===== */
+var stage=document.querySelector(".stage");
+var stick=document.getElementById("stick"), stickKnob=document.getElementById("stickKnob");
+var STICK_R=45, stickOn=false, stickCX=0, stickCY=0, lastMove=0;
+function showStick(px,py){
+  stickOn=true; stickCX=px; stickCY=py;
+  stick.style.left=px+"px"; stick.style.top=py+"px";
+  stickKnob.style.transform="translate(0px,0px)";
+  stick.classList.add("on");
+}
+function moveStick(px,py,now){
+  if(!stickOn) return;
+  var dx=px-stickCX, dy=py-stickCY;
+  var len=Math.sqrt(dx*dx+dy*dy);
+  if(len>STICK_R){ dx=dx/len*STICK_R; dy=dy/len*STICK_R; }
+  stickKnob.style.transform="translate("+dx+"px,"+dy+"px)";
+  if(Math.sqrt(dx*dx+dy*dy)<12) return;            // 死区，防手抖
+  if(now-lastMove<70) return;                      // 转向节流，避免抖动
+  if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?1:-1,0);
+  else setDir(0,dy>0?1:-1);
+  lastMove=now;
+}
+function hideStick(){ stickOn=false; stick.classList.remove("on"); }
+
+canvas.addEventListener("touchstart",function(e){
+  var r=stage.getBoundingClientRect(), t=e.touches[0];
+  showStick(t.clientX-r.left, t.clientY-r.top);
 },{passive:true});
+canvas.addEventListener("touchmove",function(e){
+  var r=stage.getBoundingClientRect(), t=e.touches[0];
+  moveStick(t.clientX-r.left, t.clientY-r.top, performance.now());
+  e.preventDefault();
+},{passive:false});
+canvas.addEventListener("touchend",hideStick,{passive:true});
+canvas.addEventListener("touchcancel",hideStick,{passive:true});
+// 桌面用鼠标拖动也能摇
+canvas.addEventListener("mousedown",function(e){
+  var r=stage.getBoundingClientRect();
+  showStick(e.clientX-r.left, e.clientY-r.top);
+  isMouseDragging=true;
+});
+canvas.addEventListener("mousemove",function(e){
+  if(!isMouseDragging) return;
+  var r=stage.getBoundingClientRect();
+  moveStick(e.clientX-r.left, e.clientY-r.top, performance.now());
+});
+window.addEventListener("mouseup",function(){ if(isMouseDragging){ isMouseDragging=false; hideStick(); } });
+var isMouseDragging=false;
+
+// 触摸设备：隐藏方向键盘
+if(("ontouchstart" in window) || navigator.maxTouchPoints>0) document.body.classList.add("touch");
 
 function togglePause(){
   if(!running) return;
@@ -573,19 +653,24 @@ function setMode(m){
 document.getElementById("modeBtn").addEventListener("click",function(){ setMode(mode==="open"?"battle":"open"); });
 document.getElementById("padModeBtn").addEventListener("click",function(){ setMode(mode==="open"?"battle":"open"); });
 
-document.getElementById("fsBtn").addEventListener("click",function(){
-  if(!document.fullscreenElement){
-    if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-    document.body.classList.add("fs");
-  } else {
-    if(document.exitFullscreen) document.exitFullscreen();
-    document.body.classList.remove("fs");
-  }
+/* 全屏：CSS 撑满（在 iframe 预览里也生效）+ 原生全屏 API 增强 */
+var fsMode=false;
+function setFs(on){
+  fsMode=on;
+  document.body.classList.toggle("fs", on);
+  document.getElementById("fsBtn").textContent = on?"退出全屏":"全屏";
+  document.getElementById("fsFloatBtn").textContent = on?"退出":"全屏";
+  try{
+    if(on){ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); }
+    else if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+  }catch(e){}
   setTimeout(function(){ resize(); if(!running) draw(0); },350);
-});
+}
+document.getElementById("fsBtn").addEventListener("click",function(){ setFs(!fsMode); });
+document.getElementById("fsFloatBtn").addEventListener("click",function(){ setFs(!fsMode); });
+canvas.addEventListener("dblclick",function(){ setFs(!fsMode); });
 document.addEventListener("fullscreenchange",function(){
-  document.body.classList.toggle("fs", !!document.fullscreenElement);
-  setTimeout(resize,300);
+  setTimeout(function(){ resize(); if(!running) draw(0); },300);
 });
 
 resize(); reset(); setMode("open"); lastTime=performance.now(); draw(0);
