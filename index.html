@@ -56,6 +56,10 @@
   #fsFloatBtn{position:absolute;left:8px;top:8px;padding:5px 12px;font-size:12px;border-radius:14px;
     background:rgba(255,255,255,.88);color:var(--ink);border:1px solid var(--line);
     box-shadow:0 2px 6px rgba(0,0,0,.18);letter-spacing:1px;}
+  #autoBtn{position:absolute;left:8px;top:44px;padding:5px 12px;font-size:12px;border-radius:14px;
+    background:rgba(255,255,255,.88);color:var(--ink);border:1px solid var(--line);
+    box-shadow:0 2px 6px rgba(0,0,0,.18);letter-spacing:1px;}
+  #autoBtn.on{background:linear-gradient(180deg,var(--teal-2),var(--teal));color:#fff;border-color:var(--teal);}
   /* 虚拟摇杆：画布任意位置按下即出现 */
   #stick{position:absolute;width:112px;height:112px;border-radius:50%;pointer-events:none;
     background:rgba(255,255,255,.28);border:2px solid rgba(31,111,107,.45);
@@ -76,6 +80,11 @@
   body.fs .board{position:fixed;right:8px;top:8px;flex-direction:column;align-items:flex-end;
     gap:4px;max-width:46vw;z-index:20;pointer-events:none;}
   body.fs .chip{background:rgba(255,255,255,.88);}
+  /* 竖屏手机进全屏时强制横屏：screen.orientation.lock 不可用（如 iOS）时用 CSS 旋转兜底 */
+  body.fs-rot .stage{position:fixed;top:50%;left:50%;
+    width:100vh;height:100vw;width:100dvh;height:100dvw;
+    transform:translate(-50%,-50%) rotate(90deg);}
+  body.fs-rot #fsFloatBtn,body.fs-rot #autoBtn{position:fixed;}
   @media (max-width:420px){ h1{font-size:19px;} .pad{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);} }
 </style>
 </head>
@@ -100,6 +109,7 @@
     <canvas id="game"></canvas>
     <canvas id="mini" width="88" height="88"></canvas>
     <button id="fsFloatBtn">全屏</button>
+    <button id="autoBtn">托管</button>
     <div id="stick"><div id="stickKnob"></div></div>
     <div class="overlay" id="startOverlay">
       <h2>苏络 · 开放世界</h2>
@@ -134,7 +144,8 @@
 
   <div class="hint"><b>手机：按住拖动 = 摇杆；连点两下 = 加速冲刺</b>（会掉豆子）<br>
     电脑：方向键 / WASD；<b>连按两次方向键 = 加速冲刺</b>；空格暂停<br>
-    点「全屏」按钮横屏铺满 · 撞到对手只掉肉，不会死</div>
+    点「全屏」→ <b>自动转横屏</b>并铺满 · 点「托管」让 AI 代打（<b>无敌</b>，撞到不掉肉也不死）<br>
+    托管时动一下方向键即接管回来</div>
   <div class="foot">苏络 · Su Luo Snake</div>
 
 <script>
@@ -184,6 +195,7 @@ const BOT_START_LEN=5;      // 对手起步比玩家短
 let hitFlash=0;
 let tickCount=0;            // 用于对手节流
 let boostUntil=0, boostHeld=false;   // 冲刺截止时刻 / 加速按钮是否按住
+let autoMode=false;                  // 托管：AI 代打 + 无敌
 let best=parseInt(localStorage.getItem("suluo_best")||"0",10)||0;
 bestEl.textContent=best;
 
@@ -215,7 +227,7 @@ function resize(){
 }
 window.addEventListener("resize", function(){ resize(); if(!running) draw(0); });
 window.addEventListener("orientationchange", function(){
-  setTimeout(function(){ resize(); if(!running) draw(0); },260);
+  setTimeout(function(){ updateOrientation(); if(!running) draw(0); },300);
 });
 // 横竖屏切换 / 移动端工具栏收放：尺寸真变了才重算
 if(window.ResizeObserver){
@@ -299,6 +311,32 @@ function botThink(sn){
   sn.nextDir=pick||opts[0];
 }
 
+/* 托管：给玩家蛇用的 AI —— 每拍决策、全图视野、不失误，比对手聪明 */
+function autoThink(sn){
+  var h=sn.body[0], i;
+  var bestF=null, bestS=-1;
+  for(i=0;i<food.length;i++){
+    var f=food[i];
+    var dx=rel(f.x,h.x,WCOLS), dy=rel(f.y,h.y,WROWS);
+    var d=Math.sqrt(dx*dx+dy*dy)+1;
+    var sc=(f.value*4)/d;                 // 大豆子优先
+    if(sc>bestS){bestS=sc;bestF=f;}
+  }
+  var opts=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}]
+    .filter(function(o){return !(o.x===-sn.dir.x&&o.y===-sn.dir.y);});
+  var occ=occSet();
+  var pick=null, pd=-1e9;
+  for(i=0;i<opts.length;i++){
+    var o=opts[i];
+    var nx=(h.x+o.x+WCOLS)%WCOLS, ny=(h.y+o.y+WROWS)%WROWS;
+    var s2 = occ[nx+","+ny] ? -1000 : 0;  // 不往别人（或自己）身上撞
+    if(bestF){ var ex=rel(bestF.x,nx,WCOLS), ey=rel(bestF.y,ny,WROWS); s2 -= Math.sqrt(ex*ex+ey*ey); }
+    else s2 += Math.random();
+    if(s2>pd){pd=s2;pick=o;}
+  }
+  sn.nextDir=pick||opts[0];
+}
+
 /* ===== 大作战机制 ===== */
 function dropMeat(sn,n){
   for(var i=0;i<n && sn.body.length>START_LEN;i++){
@@ -322,8 +360,10 @@ function killSnake(sn,killer){
 }
 function moveSnake(sn,now){
   if(!sn.alive) return;
-  if(!sn.isPlayer){
-    if(tickCount % BOT_SKIP !== 0) return;   // 半速：对手每 2 拍才走一步，你比它们快一倍
+  if(sn.isPlayer){
+    if(autoMode) autoThink(sn);
+  } else {
+    if(tickCount % BOT_SKIP !== 0) return;   // 1=与玩家同速
     botThink(sn);
   }
   sn.dir=sn.nextDir;
@@ -337,6 +377,7 @@ function moveSnake(sn,now){
     if(hit) break;
   }
   if(hit){
+    if(sn.isPlayer && autoMode) return;      // 托管无敌：只被挡住，不掉肉、不死
     if(mode==="battle"){ killSnake(sn,hit); return; }
     if(now-sn.hitCd>HIT_CD){ dropMeat(sn,DROP_MEAT); sn.hitCd=now; }
     return;
@@ -509,6 +550,13 @@ function draw(a){
       ctx.fillText(sn.name, H.x, H.y-CELL*0.52);
     }
   }
+  // 托管提示
+  if(player && player.alive && autoMode){
+    ctx.textAlign="center"; ctx.textBaseline="top";
+    ctx.font="bold "+(CELL*0.5)+"px 'STKaiti','KaiTi','楷体',serif";
+    ctx.fillStyle="rgba(31,111,107,.95)";
+    ctx.fillText("托管中 · 无敌", S/2, 8);
+  }
   // 冲刺提示
   if(player && player.alive && player.boosting){
     ctx.textAlign="right"; ctx.textBaseline="top";
@@ -581,6 +629,7 @@ function frame(now){
 /* ===== 控制 ===== */
 function setDir(nx,ny){
   if(!player||!player.alive) return;
+  if(autoMode) setAuto(false);              // 手动介入 → 立即退出托管
   if(player.dir.x===-nx&&player.dir.y===-ny) return;
   player.nextDir={x:nx,y:ny};
 }
@@ -625,6 +674,13 @@ boostBtn.addEventListener("mouseleave",endBoost);
 var stage=document.querySelector(".stage");
 var stick=document.getElementById("stick"), stickKnob=document.getElementById("stickKnob");
 var STICK_R=45, stickOn=false, stickCX=0, stickCY=0, lastMove=0;
+// 屏幕坐标 → 画面坐标（强制横屏时画面被 rotate(90deg)，需逆旋转换算）
+function toLocal(cx,cy){
+  var r=stage.getBoundingClientRect();
+  if(!forceRotate) return {x:cx-r.left, y:cy-r.top};
+  var ox=cx-(r.left+r.width/2), oy=cy-(r.top+r.height/2);
+  return {x:r.height/2+oy, y:r.width/2-ox};
+}
 function showStick(px,py){
   stickOn=true; stickCX=px; stickCY=py;
   stick.style.left=px+"px"; stick.style.top=py+"px";
@@ -647,13 +703,13 @@ function hideStick(){ stickOn=false; stick.classList.remove("on"); }
 
 var tapX=0, tapY=0, lastTapT=0;
 canvas.addEventListener("touchstart",function(e){
-  var r=stage.getBoundingClientRect(), t=e.touches[0];
-  showStick(t.clientX-r.left, t.clientY-r.top);
+  var t=e.touches[0], p=toLocal(t.clientX,t.clientY);
+  showStick(p.x, p.y);
   tapX=t.clientX; tapY=t.clientY;
 },{passive:true});
 canvas.addEventListener("touchmove",function(e){
-  var r=stage.getBoundingClientRect(), t=e.touches[0];
-  moveStick(t.clientX-r.left, t.clientY-r.top, performance.now());
+  var t=e.touches[0], p=toLocal(t.clientX,t.clientY);
+  moveStick(p.x, p.y, performance.now());
   e.preventDefault();
 },{passive:false});
 canvas.addEventListener("touchend",function(e){
@@ -669,14 +725,14 @@ canvas.addEventListener("touchend",function(e){
 canvas.addEventListener("touchcancel",hideStick,{passive:true});
 // 桌面用鼠标拖动也能摇
 canvas.addEventListener("mousedown",function(e){
-  var r=stage.getBoundingClientRect();
-  showStick(e.clientX-r.left, e.clientY-r.top);
+  var p=toLocal(e.clientX,e.clientY);
+  showStick(p.x,p.y);
   isMouseDragging=true;
 });
 canvas.addEventListener("mousemove",function(e){
   if(!isMouseDragging) return;
-  var r=stage.getBoundingClientRect();
-  moveStick(e.clientX-r.left, e.clientY-r.top, performance.now());
+  var p=toLocal(e.clientX,e.clientY);
+  moveStick(p.x,p.y,performance.now());
 });
 window.addEventListener("mouseup",function(){ if(isMouseDragging){ isMouseDragging=false; hideStick(); } });
 var isMouseDragging=false;
@@ -714,7 +770,46 @@ function setMode(m){
 document.getElementById("modeBtn").addEventListener("click",function(){ setMode(mode==="open"?"battle":"open"); });
 document.getElementById("padModeBtn").addEventListener("click",function(){ setMode(mode==="open"?"battle":"open"); });
 
+/* 托管：AI 代打 + 无敌 */
+function setAuto(on){
+  autoMode=on;
+  var b=document.getElementById("autoBtn");
+  b.textContent = on?"托管中":"托管";
+  if(on) b.classList.add("on"); else b.classList.remove("on");
+}
+document.getElementById("autoBtn").addEventListener("click",function(){ setAuto(!autoMode); });
+
 /* 全屏：CSS 撑满（在 iframe 预览里也生效）+ 原生全屏 API 增强 */
+var orientLocked=false, forceRotate=false;
+function lockLandscape(){          // 优先用原生横屏锁定（Android Chrome 全屏下可用）
+  orientLocked=false;
+  try{
+    var s=window.screen;
+    var so=s && (s.orientation||s.msOrientation||s.mozOrientation);
+    if(so && so.lock){ so.lock("landscape").then(function(){orientLocked=true;updateOrientation();}).catch(function(){}); return; }
+    if(s && s.lockOrientation){ s.lockOrientation("landscape"); orientLocked=true; return; }
+  }catch(e){}
+}
+function unlockLandscape(){
+  try{
+    var s=window.screen;
+    var so=s && (s.orientation||s.msOrientation||s.mozOrientation);
+    if(so && so.unlock) so.unlock();
+    else if(s && s.unlockOrientation) s.unlockOrientation();
+  }catch(e){}
+  orientLocked=false;
+}
+function updateOrientation(){       // 竖屏且没锁住 → 用 CSS 把画面转 90° 变横屏
+  var portrait=(window.innerHeight||0)>(window.innerWidth||0);
+  var want=!!(fsMode && portrait && !orientLocked);
+  if(want!==forceRotate){
+    forceRotate=want;
+    document.body.classList.toggle("fs-rot", want);
+  }
+  resize();
+  setTimeout(function(){ resize(); if(!running) draw(0); },120);
+}
+
 var fsMode=false;
 function setFs(on){
   fsMode=on;
@@ -722,9 +817,14 @@ function setFs(on){
   document.getElementById("fsBtn").textContent = on?"退出全屏":"全屏";
   document.getElementById("fsFloatBtn").textContent = on?"退出":"全屏";
   try{
-    if(on){ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); }
-    else if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+    if(on){
+      if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+      setTimeout(lockLandscape,150);        // 需先进入全屏才能锁方向
+    } else if(document.fullscreenElement && document.exitFullscreen){
+      document.exitFullscreen(); unlockLandscape();
+    }
   }catch(e){}
+  updateOrientation();
   resize();                                   // 立即重算，避免这几百毫秒内位图与 CSS 不匹配而拉伸
   setTimeout(function(){ resize(); if(!running) draw(0); },350);
   setTimeout(function(){ resize(); if(!running) draw(0); },900);   // 布局稳定后再兜一次
