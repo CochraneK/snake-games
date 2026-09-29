@@ -68,10 +68,14 @@
   body.touch .pad .up,body.touch .pad .left,
   body.touch .pad .down,body.touch .pad .right{display:none;}
   body.fs{padding:0;justify-content:flex-start;overflow:hidden;}
-  body.fs h1,body.fs .subtitle,body.fs .hud,body.fs .board,body.fs .toolbar,
+  body.fs h1,body.fs .subtitle,body.fs .hud,body.fs .toolbar,
   body.fs .pad,body.fs .hint,body.fs .foot{display:none;}
-  body.fs .stage{width:100vw;height:100vh;}
-  body.fs canvas#game{width:100vw;height:100vh;border:none;border-radius:0;box-shadow:none;}
+  body.fs .stage{width:100vw;height:100vh;height:100dvh;}
+  body.fs canvas#game{width:100vw;height:100vh;height:100dvh;border:none;border-radius:0;box-shadow:none;}
+  /* 全屏仍可见排行榜：右上角浮层 */
+  body.fs .board{position:fixed;right:8px;top:8px;flex-direction:column;align-items:flex-end;
+    gap:4px;max-width:46vw;z-index:20;pointer-events:none;}
+  body.fs .chip{background:rgba(255,255,255,.88);}
   @media (max-width:420px){ h1{font-size:19px;} .pad{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);} }
 </style>
 </head>
@@ -190,24 +194,43 @@ function rnd(n){ return (Math.random()*n)|0; }
 function mkFood(x,y,value){ return {x:x,y:y,ch:Math.random()<0.5?"苏":"络",value:value||1}; }
 
 /* ===== 自适应画布 ===== */
+var lastCW=0, lastCH=0;
 function resize(){
-  var cssW = canvas.clientWidth || 380, cssH;
-  if(fsMode){                       // 全屏：铺满整个视口，横屏时视野更宽
+  if(fsMode){                       // 全屏：铺满视口（横屏时视野更宽）
     canvas.style.height = "";
-    cssH = canvas.clientHeight || cssW;
   } else {                          // 常规：保持正方形
-    canvas.style.height = cssW+"px";
-    cssH = cssW;
+    canvas.style.height = (canvas.clientWidth||380)+"px";
   }
+  var cssW = canvas.clientWidth || 380;
+  var cssH = canvas.clientHeight || cssW;   // 读实际布局尺寸（会触发回流）
+  if(cssW<2 || cssH<2) return;
+  lastCW=cssW; lastCH=cssH;
   CELL = 30;                        // 固定每格像素，保证豆子里的字看得清
   VCOLS = cssW/CELL; VROWS = cssH/CELL;
   VW = cssW; VH = cssH;
+  // 位图尺寸必须严格等于 CSS 盒子尺寸，否则被非等比拉伸 → 横屏时字和圆豆会歪
   canvas.width = Math.round(cssW*dpr);
   canvas.height = Math.round(cssH*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 window.addEventListener("resize", function(){ resize(); if(!running) draw(0); });
-window.addEventListener("orientationchange", function(){ setTimeout(resize,250); });
+window.addEventListener("orientationchange", function(){
+  setTimeout(function(){ resize(); if(!running) draw(0); },260);
+});
+// 横竖屏切换 / 移动端工具栏收放：尺寸真变了才重算
+if(window.ResizeObserver){
+  try{
+    new ResizeObserver(function(){
+      var cw=canvas.clientWidth||0, ch=canvas.clientHeight||0;
+      if(Math.abs(cw-lastCW)>1 || Math.abs(ch-lastCH)>1){ resize(); if(!running) draw(0); }
+    }).observe(canvas);
+  }catch(e){}
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize", function(){
+    setTimeout(function(){ resize(); if(!running) draw(0); },120);
+  });
+}
 
 /* ===== 初始化 ===== */
 function occSet(){
@@ -702,7 +725,9 @@ function setFs(on){
     if(on){ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); }
     else if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
   }catch(e){}
+  resize();                                   // 立即重算，避免这几百毫秒内位图与 CSS 不匹配而拉伸
   setTimeout(function(){ resize(); if(!running) draw(0); },350);
+  setTimeout(function(){ resize(); if(!running) draw(0); },900);   // 布局稳定后再兜一次
 }
 document.getElementById("fsBtn").addEventListener("click",function(){ setFs(!fsMode); });
 document.getElementById("fsFloatBtn").addEventListener("click",function(){ setFs(!fsMode); });
