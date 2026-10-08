@@ -324,36 +324,103 @@ function botLineIdx(i){
   var k=i%(n-1);
   return k<playerLineIdx ? k : k+1;
 }
-function homeLineFor(id,isPlayer){
-  if(THEME.kind!=="metro") return null;
-  if(isPlayer) return THEME.lines[playerLineIdx];   // 玩家当前所选线路（切换线路可改）
-  return THEME.lines[botLineIdx(id-1)];             // 其余每条线各一条蛇
-}
-var STATION_POOL=[];
-var LINE_COLOR={};      // 线路名 -> 线路色（蛇身上区分「本线站」与「别线站」）
-if(THEME.kind==="metro"){
-  for(var _li=0;_li<THEME.lines.length;_li++){
-    var _L=THEME.lines[_li];
-    LINE_COLOR[_L.name]=_L.color;
-    for(var _si=0;_si<_L.stations.length;_si++){
-      STATION_POOL.push({name:_L.stations[_si], line:_L.name, color:_L.color});
-    }
+/* ════════════════════════════════════════════════════════════════════════
+   模式模块（MODE）：文字线 text  /  地铁线 metro
+   —— 引擎只调用 MODE.xxx() 这套钩子，完全不判断「当前是什么模式」。
+   想加第三种模式（比如「公交线路」「诗词链」）：
+     ① 在 MODES 里加一个对象，实现下面同样这些钩子；
+     ② 在 THEMES 里加一项 kind:"<新模式>"。
+   引擎一行都不用改。
+   钩子一览：
+     init()                 一次性初始化（建车站池 / 换乘表 / 线路色表）
+     lineBased              是否「以线路为单位」（决定切线路、切城市按钮与线路面板）
+     botCount()             对手数量
+     playerDef()/botDef(i)  外观 {name,color}
+     homeLineFor(id,isP)    该蛇所属线路（文字版为 null）
+     mkFood(x,y,v,forceName)生成一个食物
+     onTick()               每拍附加逻辑
+     onEat(sn,f)            吃到食物后的附加逻辑
+     drawFood/drawBody      画食物 / 画蛇身
+     drawHeadLabel(H,sn)    蛇头附加标注
+     drawOverlay(S,SH)      屏幕层附加提示
+     updateHud()            更新 HUD 附加信息
+     buildPanel()           构建侧边面板
+   ════════════════════════════════════════════════════════════════════════ */
+var STATION_POOL=[], TRANSFER={}, LINE_COLOR={};
+
+const MODES = {
+  /* ───────── 模块 A：文字线（蛇身是文字链，豆子里是字） ───────── */
+  text:{
+    lineBased:false,
+    init:function(){},
+    botCount:function(){ return BOT_COUNT; },
+    playerDef:function(){ return {name:THEME.playerName,color:THEME.playerColor}; },
+    botDef:function(i){ return {name:THEME.botNames[i%THEME.botNames.length], color:THEME.botColors[i%THEME.botColors.length]}; },
+    homeLineFor:function(){ return null; },
+    mkFood:function(x,y,value){
+      return {x:x,y:y,ch:THEME.foodChars[(Math.random()*THEME.foodChars.length)|0],value:value||1};
+    },
+    onTick:function(){},
+    onEat:function(){},
+    drawFood:function(f,FX,FY,pulse){ drawTextFood(f,FX,FY,pulse); },
+    drawBody:function(pts,sn){ drawTextBody(pts,sn); },
+    drawHeadLabel:function(){},
+    drawOverlay:function(){},
+    updateHud:function(){},
+    buildPanel:function(){ if(homePanel) homePanel.style.display="none"; }
+  },
+  /* ───────── 模块 B：地铁线（每条蛇 = 一条线路，食物 = 真实车站） ───────── */
+  metro:{
+    lineBased:true,
+    init:function(){
+      var li,si,p;
+      for(li=0;li<THEME.lines.length;li++){
+        var L=THEME.lines[li]; LINE_COLOR[L.name]=L.color;
+        for(si=0;si<L.stations.length;si++) STATION_POOL.push({name:L.stations[si],line:L.name,color:L.color});
+      }
+      // 换乘站：同一站名出现在 ≥2 条线 → 记录可换乘的线路
+      for(p=0;p<STATION_POOL.length;p++){
+        var n=STATION_POOL[p].name, ln=STATION_POOL[p].line;
+        (TRANSFER[n]=TRANSFER[n]||[]);
+        if(TRANSFER[n].indexOf(ln)<0) TRANSFER[n].push(ln);
+      }
+    },
+    botCount:function(){ return THEME.lines.length-1; },   // 每条线路都有一条蛇出战
+    playerDef:function(){ var L=THEME.lines[playerLineIdx]; return {name:L.name,color:L.color}; },
+    botDef:function(i){ var L=THEME.lines[botLineIdx(i)]; return {name:L.name,color:L.color}; },
+    homeLineFor:function(id,isPlayer){
+      if(isPlayer) return THEME.lines[playerLineIdx];   // 玩家所选线路（可切换）
+      return THEME.lines[botLineIdx(id-1)];             // 其余每条线各一条蛇
+    },
+    mkFood:function(x,y,value,forceName){
+      var s;
+      if(forceName){   // 指定站名：用于保证「下一站」一定出现在地图上
+        s={name:forceName, line:(player&&player.homeLine)?player.homeLine.name:"",
+           color:(player&&player.homeLine)?player.homeLine.color:"#888"};
+      }else s=pickStation();
+      var tr=TRANSFER[s.name];
+      return {x:x,y:y,station:true,name:s.name,line:s.line,lcolor:s.color,
+              transfer:(tr&&tr.length>1)?tr.slice():null, value:value||1};
+    },
+    onTick:function(){ ensureNextStation(); },
+    onEat:function(sn,f){ if(sn.isPlayer) tryBuildHome(sn,f); },
+    drawFood:function(f,FX,FY,pulse){ drawMetroFood(f,FX,FY,pulse); },
+    drawBody:function(pts,sn){ drawMetroBody(pts,sn); },
+    drawHeadLabel:function(H,sn){ drawMetroHeadLabel(H,sn); },
+    drawOverlay:function(S,SH){ drawTransferHint(S,SH); },
+    updateHud:function(){ updateHome(); },
+    buildPanel:function(){ buildHomePanel(); }
   }
-}
-/* 换乘站：出现在 ≥2 条线上的车站（引擎自动从 lines 数据推导，用于「金色枢纽 + 可换线路」提示） */
-var TRANSFER={};
-if(THEME.kind==="metro"){
-  for(var _p=0;_p<STATION_POOL.length;_p++){
-    var _n=STATION_POOL[_p].name, _ln=STATION_POOL[_p].line;
-    (TRANSFER[_n]=TRANSFER[_n]||[]);
-    if(TRANSFER[_n].indexOf(_ln)<0) TRANSFER[_n].push(_ln);
-  }
-}
+};
+var MODE=(MODES[THEME.kind]||MODES.text);
+MODE.init();
+
+/* 地铁模块内部：挑一个车站。
+   45% 概率直接出玩家本线的站 —— 否则全网几百个站里几乎刷不到本线「下一站」，
+   「按真实站序建设家园」这个核心玩法实际玩不起来。 */
 function pickStation(){
   if(!STATION_POOL.length) return {name:"站",line:"",color:"#888"};
-  // 地铁版：45% 概率出「玩家当前线路」的车站。
-  // 否则全网几百个站里几乎刷不到本线下一站，「按真实站序建设家园」这个核心玩法实际玩不起来。
-  if(THEME.kind==="metro" && player && player.homeLine && Math.random()<0.45){
+  if(player && player.homeLine && Math.random()<0.45){
     var L=player.homeLine, n=L.stations[rnd(L.stations.length)], pool=[], q;
     for(q=0;q<STATION_POOL.length;q++) if(STATION_POOL[q].name===n) pool.push(STATION_POOL[q]);
     if(pool.length) return pool[(Math.random()*pool.length)|0];
@@ -361,16 +428,8 @@ function pickStation(){
   }
   return STATION_POOL[(Math.random()*STATION_POOL.length)|0];
 }
-
-/* 玩家 / 对手的外观（按主题） */
-function playerDef(){
-  if(THEME.kind==="metro"){ var L=THEME.lines[playerLineIdx]; return {name:L.name,color:L.color}; }
-  return {name:THEME.playerName,color:THEME.playerColor};
-}
-function botDef(i){
-  if(THEME.kind==="metro"){ var L=THEME.lines[botLineIdx(i)]; return {name:L.name,color:L.color}; }
-  return {name:THEME.botNames[i%THEME.botNames.length], color:THEME.botColors[i%THEME.botColors.length]};
-}
+/* 食物构造的统一入口：引擎只认它，内部转发给当前模式模块 */
+function mkFood(x,y,value,forceName){ return MODE.mkFood(x,y,value,forceName); }
 
 /* ===== DOM ===== */
 const canvas=document.getElementById("game"), ctx=canvas.getContext("2d");
@@ -401,22 +460,7 @@ bestEl.textContent=best;
 const clamp=function(v,a,b){return v<a?a:(v>b?b:v);};
 function rel(v,cam,n){ var d=(v-cam)%n; if(d>n/2)d-=n; if(d<-n/2)d+=n; return d; }
 function rnd(n){ return (Math.random()*n)|0; }
-function mkFood(x,y,value,forceName){
-  if(THEME.kind==="metro"){
-    // 地铁版：食物是「真实车站」（白底圆角 + 线路色环 + 站名）；撞掉的肉也是车站
-    var s;
-    if(forceName){
-      // 指定站名：用于保证玩家「下一站」一定出现在地图上
-      s={name:forceName, line:(player&&player.homeLine)?player.homeLine.name:"",
-         color:(player&&player.homeLine)?player.homeLine.color:"#888"};
-    }else s=pickStation();
-    var tr=TRANSFER[s.name];
-    // 换乘站：出现在 ≥2 条线 → 标为金色枢纽，并附「可换线路」列表（帮助记忆线网）
-    return {x:x,y:y,station:true,name:s.name,line:s.line,lcolor:s.color,
-            transfer:(tr&&tr.length>1)?tr.slice():null, value:value||1};
-  }
-  return {x:x,y:y,ch:THEME.foodChars[(Math.random()*THEME.foodChars.length)|0],value:value||1};
-}
+/* 食物构造见上方「模式模块」：MODE.mkFood()；引擎统一入口是 mkFood() */
 
 /* ===== 自适应画布 ===== */
 var lastCW=0, lastCH=0;
@@ -477,7 +521,7 @@ function spawnFood(n){
 /* 地铁版：保证玩家「下一站」在地图上至少有一个。
    否则玩家根本不知道该去找哪个站，「按真实站序收集本线站点」的记忆目的就落空了。 */
 function ensureNextStation(){
-  if(THEME.kind!=="metro"||!player||!player.alive||!player.homeLine) return;
+  if(!player||!player.alive||!player.homeLine) return;
   if(!player.body||!player.body[0]) return;
   var st=player.homeLine.stations, idx=player.nextHomeIdx||0;
   if(idx>=st.length) return;
@@ -499,15 +543,15 @@ function spawnSnake(o){
 }
 function reset(){
   food=[]; snakes=[]; tickCount=0;
-  var pd=playerDef();
+  var pd=MODE.playerDef();
   player=spawnSnake({id:0,name:pd.name,color:pd.color,isPlayer:true});
-  player.homeLine=homeLineFor(0,true);
+  player.homeLine=MODE.homeLineFor(0,true);
   snakes.push(player);
-  // 地铁版：每条线路都有一条蛇（全线网出战）；文字版仍是固定 BOT_COUNT 个对手
-  var nBots=(THEME.kind==="metro")?(THEME.lines.length-1):BOT_COUNT;
-  for(var i=0;i<nBots;i++){ var d=botDef(i);
+  // 对手数量由模式模块决定：地铁版=每条线一条蛇（全线网出战）；文字版=固定 BOT_COUNT
+  var nBots=MODE.botCount();
+  for(var i=0;i<nBots;i++){ var d=MODE.botDef(i);
     var bs=spawnSnake({id:i+1,name:d.name,color:d.color,len:BOT_START_LEN});
-    bs.homeLine=homeLineFor(i+1,false);
+    bs.homeLine=MODE.homeLineFor(i+1,false);
     snakes.push(bs); }
   camX=player.body[0].x; camY=player.body[0].y; camInit=true;
   scoreEl.textContent=player.score; updateBoard(); spawnFood(FOOD_TARGET);
@@ -632,7 +676,7 @@ function moveSnake(sn,now){
   if(ate>=0){
     var f=food[ate]; food.splice(ate,1);
     sn.body[0].name=f.name; sn.body[0].line=f.line;     // 蛇身由吃掉的站名组成
-    if(THEME.kind==="metro" && sn.isPlayer) tryBuildHome(sn,f);
+    MODE.onEat(sn,f);   // 模式模块：吃到后的附加逻辑（地铁版=按真实站序建设家园）
     for(var k=1;k<f.value;k++){ var t=sn.body[sn.body.length-1]; sn.body.push({x:t.x,y:t.y}); }
   } else {
     sn.body.pop();
@@ -663,7 +707,7 @@ function tick(now){
       if(sn.respawnAt && now>=sn.respawnAt && !sn.isPlayer){
         var bd=botDef(sn.id-1);
         snakes[i]=spawnSnake({id:sn.id,name:bd.name,color:bd.color,len:BOT_START_LEN});
-        snakes[i].homeLine=homeLineFor(sn.id,false);
+        snakes[i].homeLine=MODE.homeLineFor(sn.id,false);
       }
       continue;
     }
@@ -672,7 +716,7 @@ function tick(now){
   for(i=0;i<snakes.length;i++) moveSnake(snakes[i],now);
   if(player && player.alive && player.boosting) moveSnake(player,now);
   if(food.length<FOOD_TARGET) spawnFood(FOOD_TARGET-food.length);
-  ensureNextStation();   // 地铁版：保证「下一站」始终出现在地图上
+  MODE.onTick();   // 模式模块每拍附加逻辑（地铁版=保证「下一站」在地图上）
   updateBoard();
 }
 
@@ -759,10 +803,6 @@ function strokeSeg(arr,color,isPlayer){
     ctx.beginPath(); ctx.arc(arr[0].x,arr[0].y,CELL*0.40,0,6.2832); ctx.stroke();
     ctx.fillStyle=color;
     ctx.beginPath(); ctx.arc(arr[0].x,arr[0].y,CELL*0.36,0,6.2832); ctx.fill();
-    if(THEME.kind==="metro"){
-      ctx.fillStyle="rgba(255,255,255,.9)";
-      ctx.beginPath(); ctx.arc(arr[0].x,arr[0].y,CELL*0.14,0,6.2832); ctx.fill();
-    }
     return;
   }
   ctx.lineCap="round"; ctx.lineJoin="round";
@@ -777,14 +817,134 @@ function strokeSeg(arr,color,isPlayer){
   ctx.strokeStyle=color; ctx.lineWidth=CELL*0.80;
   ctx.beginPath(); ctx.moveTo(arr[0].x,arr[0].y);
   for(k=1;k<arr.length;k++) ctx.lineTo(arr[k].x,arr[k].y); ctx.stroke();
-  if(THEME.kind==="metro"){   // 地铁线：中间白色虚线，像轨道
-    ctx.save();
-    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=Math.max(2,CELL*0.16);
-    ctx.setLineDash([CELL*0.20, CELL*0.20]);
-    ctx.beginPath(); ctx.moveTo(arr[0].x,arr[0].y);
-    for(k=1;k<arr.length;k++) ctx.lineTo(arr[k].x,arr[k].y); ctx.stroke();
-    ctx.restore();
+}
+
+/* ══════ 模式模块的渲染实现（由 MODE.drawFood / drawBody / drawHeadLabel / drawOverlay 调用） ══════ */
+
+/* 地铁线模块：食物 = 真实车站票根（换乘站金色枢纽 + 下一站金色脉冲环） */
+function drawMetroFood(f,FX,FY,pulse){
+  var isHub=!!f.transfer;
+  var isNext=(player&&player.homeLine&&f.name&&f.name===player.homeLine.stations[player.nextHomeIdx||0]);
+  var ss=CELL*0.34;
+  if(isHub){                                   // 换乘枢纽：金色底座
+    ctx.fillStyle="#f7d774";
+    ctx.strokeStyle="#caa23a"; ctx.lineWidth=Math.max(2,CELL*0.10);
+    roundRect(FX-ss/2-CELL*0.08,FY-ss/2-CELL*0.08,ss+CELL*0.16,ss+CELL*0.16,CELL*0.14); ctx.fill(); ctx.stroke();
+  }else{
+    ctx.fillStyle="#fff";
+    ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.85)"; ctx.lineWidth=Math.max(2,CELL*0.10);
+    roundRect(FX-ss/2,FY-ss/2,ss,ss,CELL*0.12); ctx.fill(); ctx.stroke();
   }
+  if(f.name){
+    var nm=f.name;
+    var fs2=Math.max(CELL*0.22, Math.min(CELL*0.52, Math.floor(CELL*0.92/nm.length)));
+    ctx.font="bold "+fs2+"px 'STKaiti','KaiTi','楷体',sans-serif";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    var tw=ctx.measureText(nm).width, padX=CELL*0.16, padY=CELL*0.07;
+    var bw=Math.max(tw+padX*2, CELL*0.62), bh=fs2+padY*2;
+    if(isHub){                                 // 金色票根 + 双环 + ⇄ 角标
+      ctx.fillStyle="#f7d774";
+      ctx.strokeStyle="#caa23a"; ctx.lineWidth=Math.max(2.2,CELL*0.12);
+      roundRect(FX-bw/2-CELL*0.10, FY-bh/2-CELL*0.10, bw+CELL*0.20, bh+CELL*0.20, CELL*0.22); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=Math.max(1.4,CELL*0.06);
+      roundRect(FX-bw/2-CELL*0.06, FY-bh/2-CELL*0.06, bw+CELL*0.12, bh+CELL*0.12, CELL*0.18); ctx.stroke();
+      ctx.fillStyle="#caa23a"; ctx.beginPath();
+      ctx.arc(FX+bw/2+CELL*0.10, FY-bh/2-CELL*0.10, CELL*0.20, 0, 6.2832); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="bold "+(CELL*0.26)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+      ctx.fillText("⇄", FX+bw/2+CELL*0.10, FY-bh/2-CELL*0.10+0.5);
+      ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
+      ctx.fillStyle="rgba(60,44,12,.98)"; ctx.fillText(nm,FX,FY+0.5);
+    }else{
+      ctx.fillStyle="#fff";
+      ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.9)"; ctx.lineWidth=Math.max(1.8,CELL*0.09);
+      roundRect(FX-bw/2, FY-bh/2, bw, bh, CELL*0.20); ctx.fill(); ctx.stroke();
+      ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
+      ctx.fillStyle="rgba(26,26,32,.97)"; ctx.fillText(nm,FX,FY+0.5);
+    }
+  }
+  if(isNext){                                  // 「下一站」金色脉冲环 + 角标
+    var pr=CELL*0.62+CELL*0.10*pulse;
+    ctx.strokeStyle="rgba(217,164,65,.98)"; ctx.lineWidth=Math.max(3,CELL*0.14);
+    ctx.beginPath(); ctx.arc(FX,FY,pr,0,6.2832); ctx.stroke();
+    ctx.font="bold "+(CELL*0.30)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+    ctx.textAlign="center"; ctx.textBaseline="bottom";
+    var lb="下一站", lw2=ctx.measureText(lb).width+CELL*0.22, lh2=CELL*0.38;
+    ctx.fillStyle="rgba(217,164,65,.98)";
+    roundRect(FX-lw2/2, FY-pr-lh2-CELL*0.08, lw2, lh2, CELL*0.14); ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,.98)"; ctx.fillText(lb, FX, FY-pr-CELL*0.08);
+  }
+}
+/* 文字线模块：食物 = 发光豆子（里面是字） */
+function drawTextFood(f,FX,FY,pulse){
+  var r=(f.value>1?CELL*0.44:CELL*0.32);
+  if(f.value>2) r*= (1+0.12*pulse);
+  var g=ctx.createRadialGradient(FX-r*0.3,FY-r*0.35,r*0.15,FX,FY,r*1.6);
+  g.addColorStop(0,"#ffd9a8"); g.addColorStop(0.45,"#e8783a"); g.addColorStop(1,"rgba(210,84,42,0)");
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.arc(FX,FY,r*1.6,0,6.2832); ctx.fill();
+  ctx.fillStyle="#c8451c";
+  ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.fill();
+  ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=Math.max(1,CELL*0.045);
+  ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.stroke();
+  ctx.fillStyle="#fffaf0"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.font="bold "+Math.max(13,r*1.30)+"px 'STKaiti','KaiTi','楷体',serif";
+  ctx.fillText(f.ch,FX,FY+0.5);
+}
+/* 地铁线模块：蛇身 = 细轨 + 站点圆点（本线站画大画亮，别线站画小灰字） */
+function drawMetroBody(pts,sn){
+  drawMetroTrack(pts, sn);
+  for(var k=1;k<pts.length;k++){
+    var TX=pts[k].x, TY=pts[k].y;
+    if(TX<-CELL||TY<-CELL||TX>VW+CELL||TY>VH+CELL) continue;
+    var sg=sn.body[k];
+    var segMine=!!(sg&&sg.line&&sn.homeLine&&sg.line===sn.homeLine.name);
+    var segColor=(sg&&sg.line&&LINE_COLOR[sg.line])?LINE_COLOR[sg.line]:sn.color;
+    drawStationNode(TX,TY,(sg&&sg.name)||null, segMine?sn.color:segColor, k, segMine);
+  }
+}
+/* 文字线模块：蛇身 = 粗线 + 每节一个字 */
+function drawTextBody(pts,sn){
+  var seg=[pts[0]], k;
+  for(k=1;k<pts.length;k++){
+    var d=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
+    if(d>CELL*1.8){ strokeSeg(seg,sn.color,sn.isPlayer); seg=[]; }
+    seg.push(pts[k]);
+  }
+  strokeSeg(seg,sn.color,sn.isPlayer);
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  for(k=1;k<pts.length;k++){
+    var TX2=pts[k].x, TY2=pts[k].y;
+    if(TX2<-CELL||TY2<-CELL||TX2>VW+CELL||TY2>VH+CELL) continue;
+    var label=THEME.chars[k % THEME.chars.length];
+    ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',serif";
+    ctx.fillStyle="rgba(255,255,255,.95)"; ctx.fillText(label,TX2,TY2+0.5);
+  }
+}
+/* 地铁线模块：蛇头顶上标出「当前所在站」 */
+function drawMetroHeadLabel(H,sn){
+  if(!(sn.body[0] && sn.body[0].name)) return;
+  ctx.font="bold "+(CELL*0.30)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.lineWidth=2.4; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(sn.body[0].name, H.x, H.y-CELL*0.86);
+  ctx.fillStyle="rgba(28,28,34,.98)"; ctx.fillText(sn.body[0].name, H.x, H.y-CELL*0.86);
+}
+/* 地铁线模块：靠近换乘枢纽时底部提示「可换哪几条线」 */
+function drawTransferHint(S,SH){
+  if(!(player && player.alive && player.body[0])) return;
+  var ph=player.body[0], hub=null, i;
+  for(i=0;i<food.length;i++){
+    var f=food[i];
+    if(f.transfer && Math.abs(f.x-ph.x)<=1 && Math.abs(f.y-ph.y)<=1){ hub=f; break; }
+  }
+  if(!hub) return;
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  ctx.font="bold "+(CELL*0.50)+"px 'STKaiti','KaiTi','楷体',serif";
+  var msg="换乘枢纽 · "+hub.name+" ｜ 可换 "+hub.transfer.join(" / ");
+  var bw2=ctx.measureText(msg).width+26, bh2=CELL*0.84, by=SH-CELL*0.9-bh2;
+  ctx.fillStyle="rgba(247,215,116,.97)";
+  ctx.strokeStyle="#caa23a"; ctx.lineWidth=2;
+  roundRect(S/2-bw2/2, by, bw2, bh2, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="rgba(60,44,12,.98)"; ctx.fillText(msg, S/2, by+CELL*0.18);
 }
 
 function draw(a){
@@ -801,77 +961,7 @@ function draw(a){
   for(i=0;i<food.length;i++){
     var f=food[i], FX=sx(f.x), FY=sy(f.y);
     if(FX<-CELL||FY<-CELL||FX>S+CELL||FY>SH+CELL) continue;
-    if(THEME.kind==="metro"){
-      // 真实车站：白底圆角 + 线路色环 + 站名（每个字/站是一个食物）
-      var isHub=!!f.transfer;
-      // 「下一站」= 玩家当前线路按真实站序该吃的下一个站
-      var isNext=(player&&player.homeLine&&f.name&&f.name===player.homeLine.stations[player.nextHomeIdx||0]);
-      var ss=CELL*0.34;
-      if(isHub){   // 换乘枢纽：金色底座
-        ctx.fillStyle="#f7d774";
-        ctx.strokeStyle="#caa23a"; ctx.lineWidth=Math.max(2,CELL*0.10);
-        roundRect(FX-ss/2-CELL*0.08,FY-ss/2-CELL*0.08,ss+CELL*0.16,ss+CELL*0.16,CELL*0.14); ctx.fill(); ctx.stroke();
-      }else{
-        ctx.fillStyle="#fff";
-        ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.85)"; ctx.lineWidth=Math.max(2,CELL*0.10);
-        roundRect(FX-ss/2,FY-ss/2,ss,ss,CELL*0.12); ctx.fill(); ctx.stroke();
-      }
-      if(f.name){
-        // 真实车站：白底圆角「票根」按站名尺寸自适应，站名放大加粗、白描边防糊
-        var nm=f.name;
-        var fs2=Math.max(CELL*0.22, Math.min(CELL*0.52, Math.floor(CELL*0.92/nm.length)));
-        ctx.font="bold "+fs2+"px 'STKaiti','KaiTi','楷体',sans-serif";
-        ctx.textAlign="center"; ctx.textBaseline="middle";
-        var tw=ctx.measureText(nm).width, padX=CELL*0.16, padY=CELL*0.07;
-        var bw=Math.max(tw+padX*2, CELL*0.62), bh=fs2+padY*2;
-        if(isHub){
-          // 换乘枢纽：金色「票根」+ 双环 + ⇄ 角标，强化「哪站能换哪几条线」的记忆
-          ctx.fillStyle="#f7d774";
-          ctx.strokeStyle="#caa23a"; ctx.lineWidth=Math.max(2.2,CELL*0.12);
-          roundRect(FX-bw/2-CELL*0.10, FY-bh/2-CELL*0.10, bw+CELL*0.20, bh+CELL*0.20, CELL*0.22); ctx.fill(); ctx.stroke();
-          ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=Math.max(1.4,CELL*0.06);
-          roundRect(FX-bw/2-CELL*0.06, FY-bh/2-CELL*0.06, bw+CELL*0.12, bh+CELL*0.12, CELL*0.18); ctx.stroke();
-          ctx.fillStyle="#caa23a"; ctx.beginPath();
-          ctx.arc(FX+bw/2+CELL*0.10, FY-bh/2-CELL*0.10, CELL*0.20, 0, 6.2832); ctx.fill();
-          ctx.fillStyle="#fff"; ctx.font="bold "+(CELL*0.26)+"px 'STKaiti','KaiTi','楷体',sans-serif";
-          ctx.fillText("⇄", FX+bw/2+CELL*0.10, FY-bh/2-CELL*0.10+0.5);
-          ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
-          ctx.fillStyle="rgba(60,44,12,.98)"; ctx.fillText(nm,FX,FY+0.5);
-        }else{
-          ctx.fillStyle="#fff";
-          ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.9)"; ctx.lineWidth=Math.max(1.8,CELL*0.09);
-          roundRect(FX-bw/2, FY-bh/2, bw, bh, CELL*0.20); ctx.fill(); ctx.stroke();
-          ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
-          ctx.fillStyle="rgba(26,26,32,.97)"; ctx.fillText(nm,FX,FY+0.5);
-        }
-      }
-      // 「下一站」高亮：金色脉冲环 + 角标，让玩家一眼看到该吃哪个站
-      if(isNext){
-        var pr=CELL*0.62+CELL*0.10*pulse;
-        ctx.strokeStyle="rgba(217,164,65,.98)"; ctx.lineWidth=Math.max(3,CELL*0.14);
-        ctx.beginPath(); ctx.arc(FX,FY,pr,0,6.2832); ctx.stroke();
-        ctx.font="bold "+(CELL*0.30)+"px 'STKaiti','KaiTi','楷体',sans-serif";
-        ctx.textAlign="center"; ctx.textBaseline="bottom";
-        var lb="下一站", lw2=ctx.measureText(lb).width+CELL*0.22, lh2=CELL*0.38;
-        ctx.fillStyle="rgba(217,164,65,.98)";
-        roundRect(FX-lw2/2, FY-pr-lh2-CELL*0.08, lw2, lh2, CELL*0.14); ctx.fill();
-        ctx.fillStyle="rgba(255,255,255,.98)"; ctx.fillText(lb, FX, FY-pr-CELL*0.08);
-      }
-      continue;
-    }
-    var r=(f.value>1?CELL*0.44:CELL*0.32);   // 豆子整体放大，字才看得清
-    if(f.value>2) r*= (1+0.12*pulse);
-    var g=ctx.createRadialGradient(FX-r*0.3,FY-r*0.35,r*0.15,FX,FY,r*1.6);
-    g.addColorStop(0,"#ffd9a8"); g.addColorStop(0.45,"#e8783a"); g.addColorStop(1,"rgba(210,84,42,0)");
-    ctx.fillStyle=g;
-    ctx.beginPath(); ctx.arc(FX,FY,r*1.6,0,6.2832); ctx.fill();
-    ctx.fillStyle="#c8451c";
-    ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.fill();
-    ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=Math.max(1,CELL*0.045);
-    ctx.beginPath(); ctx.arc(FX,FY,r,0,6.2832); ctx.stroke();
-    ctx.fillStyle="#fffaf0"; ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.font="bold "+Math.max(13,r*1.30)+"px 'STKaiti','KaiTi','楷体',serif";
-    ctx.fillText(f.ch,FX,FY+0.5);
+    MODE.drawFood(f,FX,FY,pulse);   // 模式模块负责画这个食物
   }
   // 蛇
   for(i=0;i<snakes.length;i++){
@@ -883,36 +973,7 @@ function draw(a){
       var ix=p.x+rel(c.x,p.x,WCOLS)*alpha, iy=p.y+rel(c.y,p.y,WROWS)*alpha;
       pts.push({x:sx(ix),y:sy(iy)});
     }
-    if(THEME.kind==="metro"){
-      // 地铁版图：细轨 + 站点圆点 + 全名（o积水潭o安定门o鼓楼大街 风格）
-      drawMetroTrack(pts, sn);
-      for(k=1;k<pts.length;k++){
-        var TX=pts[k].x, TY=pts[k].y;
-        if(TX<-CELL||TY<-CELL||TX>S+CELL||TY>SH+CELL) continue;
-        var sg=sn.body[k];
-        // 本线站：线路色、画大画亮；别线站：用该站所属线路的颜色、画小灰字 → 突出当前线路
-        var segMine=!!(sg&&sg.line&&sn.homeLine&&sg.line===sn.homeLine.name);
-        var segColor=(sg&&sg.line&&LINE_COLOR[sg.line])?LINE_COLOR[sg.line]:sn.color;
-        drawStationNode(TX,TY,(sg&&sg.name)||null, segMine?sn.color:segColor, k, segMine);
-      }
-    } else {
-      // 文字版：粗线蛇身 + 每节一个 char
-      var seg=[pts[0]];
-      for(k=1;k<pts.length;k++){
-        var d=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
-        if(d>CELL*1.8){ strokeSeg(seg,sn.color,sn.isPlayer); seg=[]; }
-        seg.push(pts[k]);
-      }
-      strokeSeg(seg,sn.color,sn.isPlayer);
-      ctx.textAlign="center"; ctx.textBaseline="middle";
-      for(k=1;k<pts.length;k++){
-        var TX2=pts[k].x, TY2=pts[k].y;
-        if(TX2<-CELL||TY2<-CELL||TX2>S+CELL||TY2>SH+CELL) continue;
-        var label=THEME.chars[k % THEME.chars.length];
-        ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',serif";
-        ctx.fillStyle="rgba(255,255,255,.95)"; ctx.fillText(label,TX2,TY2+0.5);
-      }
-    }
+    MODE.drawBody(pts,sn);   // 模式模块负责画这条蛇的身子
     // 头
     var H=pts[0];
     if(H.x>-CELL&&H.y>-CELL&&H.x<S+CELL&&H.y<SH+CELL){
@@ -934,12 +995,7 @@ function draw(a){
       ctx.font="10px sans-serif"; ctx.textAlign="center";
       ctx.fillStyle=sn.isPlayer?sn.color:"rgba(70,66,60,.85)";
       ctx.fillText(sn.name, H.x, H.y-CELL*0.52);
-      if(THEME.kind==="metro" && sn.body[0] && sn.body[0].name){
-        ctx.font="bold "+(CELL*0.30)+"px 'STKaiti','KaiTi','楷体',sans-serif";
-        ctx.textAlign="center"; ctx.textBaseline="middle";
-        ctx.lineWidth=2.4; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(sn.body[0].name, H.x, H.y-CELL*0.86);
-        ctx.fillStyle="rgba(28,28,34,.98)"; ctx.fillText(sn.body[0].name, H.x, H.y-CELL*0.86);
-      }
+      MODE.drawHeadLabel(H,sn);   // 模式模块的蛇头附加标注
       if(sn.isPlayer && sn.homeGlow>0){
         ctx.font="bold "+(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',sans-serif";
         ctx.fillStyle="rgba(217,164,65,.98)";
@@ -963,25 +1019,7 @@ function draw(a){
     ctx.fillText("加速中", S-8, 8);
   }
   if(hitFlash>0){ ctx.fillStyle="rgba(200,50,30,"+(0.30*hitFlash)+")"; ctx.fillRect(0,0,S,SH); }
-  // 地铁版：蛇头靠近「换乘枢纽」时，底部居中提示「可换哪几条线」（帮助记忆线网骨架）
-  if(THEME.kind==="metro" && player && player.alive && player.body[0]){
-    var ph=player.body[0], hub=null;
-    for(i=0;i<food.length;i++){
-      var f=food[i];
-      if(f.transfer && Math.abs(f.x-ph.x)<=1 && Math.abs(f.y-ph.y)<=1){ hub=f; break; }
-    }
-    if(hub){
-      ctx.textAlign="center"; ctx.textBaseline="top";
-      ctx.font="bold "+(CELL*0.50)+"px 'STKaiti','KaiTi','楷体',serif";
-      var msg="换乘枢纽 · "+hub.name+" ｜ 可换 "+hub.transfer.join(" / ");
-      var bw2=ctx.measureText(msg).width+26, bh2=CELL*0.84;
-      var by=SH-CELL*0.9-bh2;
-      ctx.fillStyle="rgba(247,215,116,.97)";
-      ctx.strokeStyle="#caa23a"; ctx.lineWidth=2;
-      roundRect(S/2-bw2/2, by, bw2, bh2, 12); ctx.fill(); ctx.stroke();
-      ctx.fillStyle="rgba(60,44,12,.98)"; ctx.fillText(msg, S/2, by+CELL*0.18);
-    }
-  }
+  MODE.drawOverlay(S,SH);   // 模式模块的屏幕层提示（地铁版=换乘枢纽提示）
   drawMini();
 }
 
@@ -1025,7 +1063,7 @@ function updateBoard(){
     c.innerHTML=(medals[rk]||(rk+1)+".")+sn.name+"<span class='sc'>"+sn.score+"</span>";
     boardEl.appendChild(c);
   }
-  updateHome();
+  MODE.updateHud();   // 模式模块的 HUD 附加信息（地铁版=家园进度 + 下一站）
 }
 
 /* 地铁版：统计玩家已收集的本线车站（家园进度） */
@@ -1038,7 +1076,7 @@ function computeHome(sn){
   return {built:built,total:total,next:next};
 }
 function updateHome(){
-  if(THEME.kind!=="metro" || !player || !player.homeLine) return;
+  if(!player || !player.homeLine) return;
   var h=computeHome(player);
   homeEl.textContent=h.built+"/"+h.total;
   if(hpCountEl) hpCountEl.textContent=h.built+"/"+h.total;
@@ -1054,7 +1092,7 @@ function updateHome(){
 function startLineHi(){
   if(lineHiTimer) return;
   lineHiTimer=setInterval(function(){
-    if(THEME.kind!=="metro" || !homeLineRows || !homeLineRows.length) return;
+    if(!homeLineRows || !homeLineRows.length) return;
     lineHiIdx=(lineHiIdx+1)%homeLineRows.length;
     for(var i=0;i<homeLineRows.length;i++){
       homeLineRows[i].classList.toggle("lit", i===lineHiIdx);
@@ -1062,7 +1100,7 @@ function startLineHi(){
   }, 520);
 }
 function buildHomePanel(){
-  if(THEME.kind!=="metro" || !player || !player.homeLine){ if(homePanel) homePanel.style.display="none"; return; }
+  if(!player || !player.homeLine){ if(homePanel) homePanel.style.display="none"; return; }
   homePanel.style.display="block"; homePanel.innerHTML="";
   // 头部：家园建设进度（X/N）
   var h4=document.createElement("h4");
@@ -1232,13 +1270,13 @@ function togglePause(){
 function startGame(){
   reset(); running=true; paused=false; camInit=false; hitFlash=0;
   // 切换线路 / 切换城市：仅地铁版显示
-  var slb=document.getElementById("switchLineBtn"); if(slb) slb.style.display=(THEME.kind==="metro")?"":"none";
+  var slb=document.getElementById("switchLineBtn"); if(slb) slb.style.display=MODE.lineBased?"":"none";
   var mc=0; for(var _k in THEMES){ if(THEMES[_k].kind==="metro") mc++; }
-  var scb=document.getElementById("switchCityBtn"); if(scb) scb.style.display=(THEME.kind==="metro"&&mc>1)?"":"none";
+  var scb=document.getElementById("switchCityBtn"); if(scb) scb.style.display=(MODE.lineBased&&mc>1)?"":"none";
   lastTick=performance.now(); lastTime=lastTick; alpha=0;
   document.getElementById("pauseBtn").textContent="暂停";
   startOverlay.classList.add("hidden"); pauseOverlay.classList.add("hidden"); deadOverlay.classList.add("hidden");
-  buildHomePanel(); updateHome();
+  MODE.buildPanel(); MODE.updateHud();
   updateBoard(); resize(); draw(0);
 }
 document.getElementById("startBtn").addEventListener("click",startGame);
@@ -1369,7 +1407,7 @@ function applyTheme(){
   document.getElementById("ovH2").textContent = THEME.label + " · 开放世界";
   document.getElementById("ovIntro").innerHTML = THEME.intro;
   document.getElementById("pageFoot").textContent = THEME.foot;
-  var isMetro = THEME.kind==="metro";
+  var isMetro = MODE.lineBased;
   document.getElementById("homeWrap").classList.toggle("show", isMetro);
   if(!isMetro && homePanel) homePanel.style.display="none";
 }
