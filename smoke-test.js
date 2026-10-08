@@ -94,11 +94,12 @@ function drive(sandbox, frames) {
 const expect = {
   su: "苏络贪吃蛇 · 开放世界",
   cc: "CC 贪吃蛇 · 开放世界",
-  beijing: "北京地铁贪吃蛇 · 开放世界"
+  beijing: "北京地铁贪吃蛇 · 开放世界",
+  nanjing: "南京地铁贪吃蛇 · 开放世界"
 };
 
 let ok = true;
-for (const theme of ["su", "cc", "beijing"]) {
+for (const theme of ["su", "cc", "beijing", "nanjing"]) {
   const sb = makeSandbox(theme);
   try {
     vm.runInNewContext(src, sb, { filename: "play.html" });
@@ -111,6 +112,8 @@ for (const theme of ["su", "cc", "beijing"]) {
     console.error("FAIL [" + theme + "] title=" + JSON.stringify(sb.document.title) + " expected " + JSON.stringify(expect[theme]));
     ok = false;
   }
+  // (transfer-station detection is verified post-loop against the parsed THEMES data)
+
   // start game
   (sb.__els["startBtn"]._l.click || []).forEach(fn => fn());
   drive(sb, 300);
@@ -134,4 +137,21 @@ for (const theme of ["su", "cc", "beijing"]) {
 }
 
 console.log(ok ? "\nALL PASS" : "\nSOME FAILED");
+
+/* verify metro data yields transfer hubs — the engine derives TRANSFER (gold hubs) from this */
+const tm = html.match(/const THEMES = (\{[\s\S]*?\n\});\s*\nfunction pickTheme/);
+if (!tm) { console.error("FAIL could not locate THEMES literal"); ok = false; }
+else {
+  const THEMES = vm.runInNewContext("(" + tm[1] + ")", {});
+  for (const id of ["beijing", "nanjing"]) {
+    const T = THEMES[id];
+    const seen = {};
+    for (const L of T.lines) for (const s of L.stations) (seen[s] = seen[s] || new Set()).add(L.name);
+    let c = 0; const ex = [];
+    for (const s in seen) if (seen[s].size > 1) { c++; if (ex.length < 3) ex.push(s + "(" + [...seen[s]].join("/") + ")"); }
+    if (c === 0) { console.error("FAIL [" + id + "] no transfer hubs in data"); ok = false; }
+    else console.log("  [" + id + "] data transfer hubs: " + c + " (e.g. " + ex.join(" / ") + ")");
+  }
+}
+
 process.exit(ok ? 0 : 1);

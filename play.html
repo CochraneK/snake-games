@@ -109,6 +109,12 @@
   .home-panel .lp-name{font-size:11px;color:var(--ink);white-space:nowrap;}
   body.fs .home-panel{max-height:62vh;}
   body.fs #homePanel{left:8px;bottom:8px;}
+  /* 切换线路 / 切换城市 选择器 */
+  .line-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:540px;margin:10px auto;}
+  .line-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:12px;
+    background:#fff;border:2px solid #ccc;color:#2a2a30;font-size:14px;cursor:pointer;font-family:inherit;}
+  .line-chip.cur{box-shadow:0 0 0 3px rgba(217,164,65,.6);}
+  .line-chip .sw{width:14px;height:14px;border-radius:4px;display:inline-block;}
 </style>
 </head>
 <body>
@@ -124,6 +130,8 @@
 
   <div class="toolbar">
     <button id="modeBtn" class="on">模式：开放世界</button>
+    <button id="switchLineBtn">切换线路</button>
+    <button id="switchCityBtn">切换城市</button>
     <button id="fsBtn">全屏</button>
   </div>
 
@@ -150,6 +158,11 @@
       <h2>被 <span id="killerName">对手</span> 撞死</h2>
       <p>最终长度 <span class="big" id="finalScore">0</span><br>你的身体已散成豆子，被别人抢走了</p>
       <button id="reviveBtn">重新开始</button>
+    </div>
+    <div class="overlay hidden" id="linePicker">
+      <h2 id="pickerTitle">选择线路</h2>
+      <div id="lineGrid" class="line-grid"></div>
+      <button id="linePickerClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
     </div>
   </div>
 
@@ -244,10 +257,54 @@ const THEMES = {
       {name:"8号线",  color:"#009C5B", stations:["朱辛庄","育知路","平西府","回龙观东大街","霍营","育新","西小口","永泰庄","林萃桥","森林公园南门","奥林匹克公园","奥体中心","北土城","安华桥","安德里北街","鼓楼大街","什刹海","南锣鼓巷","中国美术馆","金鱼胡同","王府井","前门","珠市口","天桥","永定门外","木樨园","海户屯","大红门","大红门南","和义","东高地","火箭万源","五福堂","德茂","瀛海"]},
       {name:"10号线", color:"#009ACA", stations:["巴沟","苏州街","海淀黄庄","知春里","知春路","西土城","牡丹园","健德门","北土城","安贞门","惠新西街南口","芍药居","太阳宫","三元桥","亮马桥","农业展览馆","团结湖","呼家楼","金台夕照","国贸","双井","劲松","潘家园","十里河","分钟寺","成寿寺","宋家庄","石榴庄","大红门","角门东","角门西","草桥","纪家庙","首经贸","丰台站","泥洼","西局","六里桥","莲花桥","公主坟","西钓鱼台","慈寿寺","车道沟","长春桥","火器营"]},
       {name:"13号线", color:"#F0E000", stations:["西直门","大钟寺","知春路","五道口","上地","西二旗","龙泽","回龙观","霍营","立水桥","北苑","望京西","芍药居","光熙门","柳芳","东直门"]},
-      {name:"14号线", color:"#D594A4", stations:["张郭庄","园博园","大瓦窑","郭庄子","大井","七里庄","西局","东管头","丽泽商务区","菜户营","西铁营","景风门","北京南站","永定门外","景泰","蒲黄榆","方庄","十里河","北工大西门","平乐园","九龙山","大望路","金台路","朝阳公园","枣营","东风北桥","将台","望京南","阜通","望京","东湖渠","来广营","善各庄"]}
+      {name:"14号线", color:"#D594A4", stations:["张郭庄","园博园","大瓦窑","郭庄子","大井","七里庄","西局","东管头","丽泽商务区","菜户营","西铁营","景风门","北京南站","永定门外","景泰","蒲黄榆","方庄","十里河","北工大西门","平乐园","九龙山","大望路","金台路","朝阳公园","枣营","东风北桥","将台","望京南","阜通","望京","东湖渠","来广营","善各庄"]},
+      {name:"3号线",  color:"#E63266", stations:["东四十条","工人体育场","团结湖","朝阳公园","石佛营","朝阳站","姚家园","东坝","东坝北"]},
+      {name:"9号线",  color:"#8DC63F", stations:["国家图书馆","白石桥南","白堆子","军事博物馆","北京西站","六里桥东","六里桥","七里庄","丰台东大街","丰台南路","科怡路","丰益桥南","首经贸","郭公庄"]},
+      {name:"11号线", color:"#F47A3B", stations:["模式口","金安桥","北辛安","新首钢"]},
+      {name:"12号线", color:"#7A5C3E", stations:["四季青桥","蓝靛厂","长春桥","苏州桥","人民大学","大钟寺","蓟门桥","北太平庄","马甸桥","安华桥","和平西桥","光熙门","西坝河","三元桥","将台西","高家园","驼房营","北岗子","东坝","东坝北"]},
+      {name:"15号线", color:"#9C4B9C", stations:["清华东路西口","六道口","北沙滩","奥林匹克公园","安立路","大屯路东","关庄","望京西","望京","望京东","崔各庄","马泉营","孙河","国展","花梨坎","后沙峪","南法信","石门","顺义","俸伯"]},
+      {name:"16号线", color:"#2E9E5B", stations:["北安河","温阳路","稻香湖路","屯佃","永丰","永丰南","西北旺","马连洼","农大南路","西苑","万泉河桥","苏州街","苏州桥","万寿寺","国家图书馆","二里沟","甘家口","玉渊潭东门","木樨地","达官营","红莲南路","丽泽商务区","东管头南","丰台站","丰台南路","富丰桥","看丹","榆树庄","宛平城"]},
+      {name:"17号线", color:"#00A09A", stations:["未来科学城北","未来科学城","天通苑东","清河营","红军营","太阳宫","西坝河","工人体育场","北新桥","永安里","广渠门外","周家庄","十八里店","北神树","次渠北","次渠","嘉会湖"]},
+      {name:"18号线", color:"#5B5BD6", stations:["马连洼","海淀郊野公园","软件园","清河","上清桥","志新桥","北沙滩","奥体中心","安贞桥","东大桥","天通苑东"]},
+      {name:"19号线", color:"#A8446E", stations:["新宫","新发地","草桥","景风门","牛街","太平桥","金融街","平安里","北太平庄","牡丹园"]},
+      {name:"亦庄线",  color:"#E4007F", stations:["宋家庄","肖村","小红门","旧宫","亦庄桥","亦庄文化园","万源街","荣京东街","荣昌东街","同济南路","经海路","次渠","次渠南","亦庄火车站"]},
+      {name:"房山线",  color:"#B11E2D", stations:["阎村东","紫草坞","阎村","大石河东","马各庄","饶乐府","良乡大学城西","良乡大学城","良乡大学城北","广阳城","篱笆房","长阳","稻田","大葆台","郭公庄","首经贸","东管头南"]},
+      {name:"燕房线",  color:"#B11E2D", stations:["阎村东","星城","大石河东","马各庄","饶乐府","房山城关","燕山"]},
+      {name:"S1线",   color:"#B0651E", stations:["苹果园","金安桥","四道桥","桥户营","上岸","栗园庄","小园","石厂"]},
+      {name:"昌平线",  color:"#E472A0", stations:["昌平西山口","十三陵景区","昌平","北邵洼","南邵","沙河高教园","沙河","巩华城","朱辛庄","生命科学园","西二旗","清河站","上清桥","学知园","六道口","蓟门桥"]},
+      {name:"西郊线",  color:"#C0392B", stations:["巴沟","颐和园西门","茶棚","万安","四季青","香山"]},
+      {name:"首都机场线", color:"#9AA0A6", stations:["北新桥","东直门","三元桥","2号航站楼","3号航站楼"]},
+      {name:"大兴机场线", color:"#1F3A93", stations:["草桥","大兴新城","大兴机场"]},
+      {name:"亦庄T1线", color:"#C0392B", stations:["老观里","定海园","定海园西","永昌南路","同济南路","荣昌东街","科创街","经海路","经海一路","定海园北","经海三路","科创十一街","经海五路","亦庄火车站"]}
     ],
     intro:"吃<b>真实车站</b>变长，长度就是分数。<br>每条蛇就是一条<b>地铁线路</b>（颜色 = 线路色），<br>蛇身由你吃掉的<b>真实站名</b>串成，按真实相邻顺序建设你的<b>家园（全线路站点）</b>。<br>撞到对手只<b>掉三节肉</b>（不会死），肉会变成车站被抢。<br><b>手机：按住拖动转向，连点两下加速；点「全屏」按钮可横屏铺满</b>",
     bestKey:"beijing_best"
+  },
+  nanjing: {
+    id:"nanjing", label:"南京地铁", kind:"metro",
+    title:"南京地铁贪吃蛇 · 开放世界",
+    foot:"南京地铁 · Nanjing Metro Snake",
+    // 颜色 = 南京地铁各线标准标识色；stations = 该线真实车站（按真实运行顺序排列）
+    lines:[
+      {name:"1号线",  color:"#009ACE", stations:["中国药科大学","南医大·江苏经贸学院","龙眠大道","天印大道","竹山路","小龙湾","百家湖","胜太路","河定桥","双龙大道","南京南站","花神庙","软件大道","天隆寺","安德门","中华门","三山街","张府园","新街口","珠江路","鼓楼","玄武门","新模范马路","南京站","红山动物园","迈皋桥","燕子矶","吉祥庵","晓庄","神农路","笆斗山","八卦洲大桥南"]},
+      {name:"2号线",  color:"#A6093D", stations:["鱼嘴","天保街","青莲街","螺塘路","油坊桥","雨润大街","中胜","元通","奥体东","兴隆大街","集庆门大街","云锦路","莫愁湖","汉中门","上海路","新街口","大行宫","西安门","明故宫","苜蓿园","下马坊","孝陵卫","钟灵街","马群","金马路","仙鹤门","学则路","仙林中心","羊山公园","南大仙林校区","经天路"]},
+      {name:"3号线",  color:"#009A44", stations:["林场","高新开发区","泰冯路","天润城","柳洲东路","上元门","五塘广场","小市","南京站","南京林业大学·新庄","鸡鸣寺","浮桥","大行宫","常府街","夫子庙","武定门","雨花门","卡子门","大明路","明发广场","南京南站","宏运大道","胜太西路","天元西路","九龙湖","诚信大道","东大九龙湖校区","秣周东路","秣陵"]},
+      {name:"4号线",  color:"#7D55C7", stations:["龙江","草场门","云南路","鼓楼","鸡鸣寺","九华山","岗子村","蒋王庙","王家湾","聚宝山","徐庄·苏宁总部","金马路","汇通路","灵山","东流","孟北","桦墅","仙林湖"]},
+      {name:"5号线",  color:"#F2DA51", stations:["方家营","南京西站","下关","盐仓桥","福建路","虹桥","青春广场","云南路","五台山","上海路","朝天宫","三山街","夫子庙","大中桥","通济门","光华门","石门坎","小天堂","七桥瓮","机场路","大校场","神机营","东山","文靖路","东山香樟园","新亭东路","吉印大道"]},
+      {name:"6号线",  color:"#15B9A6", stations:["南京南站","夹岗","机场跑道旧址","市中医院","应天东街","中和桥","光华门","明故宫","富贵山","岗子村","花园路","红山新城","营苑南路","万寿","燕江新城","兴学路","兴智街","十月广场","金陵石化","栖霞山"]},
+      {name:"7号线",  color:"#4A7729", stations:["仙新路","尧化门","尧化新村","丁家庄","丁家庄南","晓庄","万寿","幕府山","五塘广场","幕府西路","钟阜路","福建路","古平岗","草场门","清凉山","莫愁湖","大士茶亭","南湖","嘉陵江东街","中胜","新城科技园","梦都大街东","西善桥"]},
+      {name:"10号线", color:"#B9975B", stations:["雨山路","文德东路","龙华路","南京工业大学","浦口万汇城","临江·青奥体育公园","江心洲","绿博园","梦都大街","奥体中心","元通","中胜","小行","安德门","春江路","铁心桥","景明佳园","花神庙","南京南站","共青团路","卡子门","大校场","机场跑道旧址","今朝路","杨庄","王武庄","石杨东路","东麒路"]},
+      {name:"S1线",   color:"#00B2A9", stations:["南京南站","翠屏山","河海大学·佛城西路","吉印大道","正方中路","翔宇路北","翔宇路南","空港新城江宁"]},
+      {name:"S2线",   color:"#E07B9B", stations:["西善桥","雨花","板桥北","板桥","板桥南","宁桥路","江宁镇","牧龙","铜井","桃源","姑溪河","当涂","当涂东","马鞍山","采石矶","太白"]},
+      {name:"S3线",   color:"#B06C96", stations:["南京南站","景明佳园","铁心桥","春江路","贾西","油坊桥","永初路","平良大街","吴侯街","高庙路","天保","刘村","马骡圩","兰台","双垅","石碛河","桥林","林山","高家冲"]},
+      {name:"S4线",   color:"#E8622A", stations:["滁州高铁站","滁州","技术学院","金鹏","乌衣","汪郢","汊河","汊河新城","新安","苏滁"]},
+      {name:"S6线",   color:"#C8A2C8", stations:["马群","百水桥","麒麟门","东郊小镇","锁石","坟头","侯家塘","汤泉西路","汤山","泉都大街","黄梅","宝华山","杨塘路","东大街","句容"]},
+      {name:"S7线",   color:"#D98BA0", stations:["空港新城江宁","柘塘","空港新城溧水","群力","卧龙湖","溧水","中山湖","幸庄","无想山"]},
+      {name:"S8线",   color:"#F2A900", stations:["长江大桥北","毛纺厂路","泰山新村","信息工程大学","浦珠北路","浦六路","大厂","葛塘","长芦","化工园","雄州","凤凰山公园","方州广场","沈桥","八百桥","金牛湖"]},
+      {name:"S9线",   color:"#E3C039", stations:["翔宇路南","铜山","石湫","明觉","团结","高淳"]}
+    ],
+    intro:"吃<b>真实车站</b>变长，长度就是分数。<br>每条蛇就是一条<b>地铁线路</b>（颜色 = 线路色），<br>蛇身由你吃掉的<b>真实站名</b>串成，按真实相邻顺序建设你的<b>家园（全线路站点）</b>。<br>撞到对手只<b>掉三节肉</b>（不会死），肉会变成车站被抢。<br><b>手机：按住拖动转向，连点两下加速；点「全屏」按钮可横屏铺满</b>",
+    bestKey:"nanjing_best"
   }
 };
 function pickTheme(){
@@ -255,11 +312,12 @@ function pickTheme(){
   return THEMES.su;
 }
 const THEME = pickTheme();
+var playerLineIdx=0;   // 地铁版：玩家当前所玩线路（切换线路用）
 
 /* —— 地铁版：真实站名池 + 每条蛇的「家园」线路 —— */
 function homeLineFor(id,isPlayer){
   if(THEME.kind!=="metro") return null;
-  if(isPlayer) return THEME.lines[0];                       // 玩家默认建 1 号线家园
+  if(isPlayer) return THEME.lines[playerLineIdx];            // 玩家当前所选线路（切换线路可改）
   return THEME.lines[1 + ((id-1) % (THEME.lines.length-1))];
 }
 var STATION_POOL=[];
@@ -271,6 +329,15 @@ if(THEME.kind==="metro"){
     }
   }
 }
+/* 换乘站：出现在 ≥2 条线上的车站（引擎自动从 lines 数据推导，用于「金色枢纽 + 可换线路」提示） */
+var TRANSFER={};
+if(THEME.kind==="metro"){
+  for(var _p=0;_p<STATION_POOL.length;_p++){
+    var _n=STATION_POOL[_p].name, _ln=STATION_POOL[_p].line;
+    (TRANSFER[_n]=TRANSFER[_n]||[]);
+    if(TRANSFER[_n].indexOf(_ln)<0) TRANSFER[_n].push(_ln);
+  }
+}
 function pickStation(){
   if(!STATION_POOL.length) return {name:"站",line:"",color:"#888"};
   return STATION_POOL[(Math.random()*STATION_POOL.length)|0];
@@ -278,7 +345,7 @@ function pickStation(){
 
 /* 玩家 / 对手的外观（按主题） */
 function playerDef(){
-  if(THEME.kind==="metro"){ var L=THEME.lines[0]; return {name:L.name,color:L.color}; }
+  if(THEME.kind==="metro"){ var L=THEME.lines[playerLineIdx]; return {name:L.name,color:L.color}; }
   return {name:THEME.playerName,color:THEME.playerColor};
 }
 function botDef(i){
@@ -319,7 +386,10 @@ function mkFood(x,y,value){
   if(THEME.kind==="metro"){
     // 地铁版：食物是「真实车站」（白底圆角 + 线路色环 + 站名）；撞掉的肉也是车站
     var s=pickStation();
-    return {x:x,y:y,station:true,name:s.name,line:s.line,lcolor:s.color,value:value||1};
+    var tr=TRANSFER[s.name];
+    // 换乘站：出现在 ≥2 条线 → 标为金色枢纽，并附「可换线路」列表（帮助记忆线网）
+    return {x:x,y:y,station:true,name:s.name,line:s.line,lcolor:s.color,
+            transfer:(tr&&tr.length>1)?tr.slice():null, value:value||1};
   }
   return {x:x,y:y,ch:THEME.foodChars[(Math.random()*THEME.foodChars.length)|0],value:value||1};
 }
@@ -527,6 +597,8 @@ function moveSnake(sn,now){
     for(var k=1;k<f.value;k++){ var t=sn.body[sn.body.length-1]; sn.body.push({x:t.x,y:t.y}); }
   } else {
     sn.body.pop();
+    // 地铁版：站点名朝蛇头流动，使蛇身成为一条「站名链」（头=最近吃到的站）
+    for(var j=0;j<sn.body.length-1;j++){ sn.body[j].name=sn.body[j+1].name; sn.body[j].line=sn.body[j+1].line; }
   }
   sn.score=sn.body.length;
   if(sn.isPlayer){
@@ -597,6 +669,44 @@ function roundRect(x,y,w,h,r){
   ctx.closePath();
 }
 
+/* 地铁版图：细轨（线路色）+ 白色中线，像真实轨道 */
+function drawMetroTrack(pts, sn){
+  ctx.save();
+  ctx.strokeStyle=sn.color; ctx.lineWidth=CELL*0.20; ctx.lineCap="round"; ctx.lineJoin="round";
+  var started=false, k;
+  for(k=1;k<pts.length;k++){
+    var d=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
+    if(d>CELL*1.8){ started=false; continue; }
+    if(!started){ ctx.beginPath(); ctx.moveTo(pts[k-1].x,pts[k-1].y); started=true; }
+    ctx.lineTo(pts[k].x,pts[k].y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=Math.max(1,CELL*0.06);
+  started=false;
+  for(k=1;k<pts.length;k++){
+    var d2=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
+    if(d2>CELL*1.8){ started=false; continue; }
+    if(!started){ ctx.beginPath(); ctx.moveTo(pts[k-1].x,pts[k-1].y); started=true; }
+    ctx.lineTo(pts[k].x,pts[k].y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+/* 地铁版站点节点：线路色圆点 + 白环 + 全名（上下交错防挤） */
+function drawStationNode(x,y,name,color,k){
+  var r=CELL*0.30;
+  ctx.beginPath(); ctx.arc(x,y,r,0,6.2832);
+  ctx.fillStyle=color; ctx.fill();
+  ctx.lineWidth=Math.max(1.6,CELL*0.08); ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.stroke();
+  if(!name) return;
+  var fs=Math.max(CELL*0.20, Math.min(CELL*0.34, Math.floor(CELL*0.92/name.length)));
+  ctx.font="bold "+fs+"px 'STKaiti','KaiTi','楷体',sans-serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  var oy=(k%2===0)? -r-CELL*0.40 : r+CELL*0.44;
+  ctx.lineWidth=2.4; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(name,x,y+oy);
+  ctx.fillStyle="rgba(28,28,34,.98)"; ctx.fillText(name,x,y+oy);
+}
+
 function strokeSeg(arr,color,isPlayer){
   var k;
   if(arr.length<2){
@@ -648,10 +758,17 @@ function draw(a){
     if(FX<-CELL||FY<-CELL||FX>S+CELL||FY>SH+CELL) continue;
     if(THEME.kind==="metro"){
       // 真实车站：白底圆角 + 线路色环 + 站名（每个字/站是一个食物）
+      var isHub=!!f.transfer;
       var ss=CELL*0.34;
-      ctx.fillStyle="#fff";
-      ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.85)"; ctx.lineWidth=Math.max(2,CELL*0.10);
-      roundRect(FX-ss/2,FY-ss/2,ss,ss,CELL*0.12); ctx.fill(); ctx.stroke();
+      if(isHub){   // 换乘枢纽：金色底座
+        ctx.fillStyle="#f7d774";
+        ctx.strokeStyle="#caa23a"; ctx.lineWidth=Math.max(2,CELL*0.10);
+        roundRect(FX-ss/2-CELL*0.08,FY-ss/2-CELL*0.08,ss+CELL*0.16,ss+CELL*0.16,CELL*0.14); ctx.fill(); ctx.stroke();
+      }else{
+        ctx.fillStyle="#fff";
+        ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.85)"; ctx.lineWidth=Math.max(2,CELL*0.10);
+        roundRect(FX-ss/2,FY-ss/2,ss,ss,CELL*0.12); ctx.fill(); ctx.stroke();
+      }
       if(f.name){
         // 真实车站：白底圆角「票根」按站名尺寸自适应，站名放大加粗、白描边防糊
         var nm=f.name;
@@ -660,11 +777,26 @@ function draw(a){
         ctx.textAlign="center"; ctx.textBaseline="middle";
         var tw=ctx.measureText(nm).width, padX=CELL*0.16, padY=CELL*0.07;
         var bw=Math.max(tw+padX*2, CELL*0.62), bh=fs2+padY*2;
-        ctx.fillStyle="#fff";
-        ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.9)"; ctx.lineWidth=Math.max(1.8,CELL*0.09);
-        roundRect(FX-bw/2, FY-bh/2, bw, bh, CELL*0.20); ctx.fill(); ctx.stroke();
-        ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
-        ctx.fillStyle="rgba(26,26,32,.97)"; ctx.fillText(nm,FX,FY+0.5);
+        if(isHub){
+          // 换乘枢纽：金色「票根」+ 双环 + ⇄ 角标，强化「哪站能换哪几条线」的记忆
+          ctx.fillStyle="#f7d774";
+          ctx.strokeStyle="#caa23a"; ctx.lineWidth=Math.max(2.2,CELL*0.12);
+          roundRect(FX-bw/2-CELL*0.10, FY-bh/2-CELL*0.10, bw+CELL*0.20, bh+CELL*0.20, CELL*0.22); ctx.fill(); ctx.stroke();
+          ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=Math.max(1.4,CELL*0.06);
+          roundRect(FX-bw/2-CELL*0.06, FY-bh/2-CELL*0.06, bw+CELL*0.12, bh+CELL*0.12, CELL*0.18); ctx.stroke();
+          ctx.fillStyle="#caa23a"; ctx.beginPath();
+          ctx.arc(FX+bw/2+CELL*0.10, FY-bh/2-CELL*0.10, CELL*0.20, 0, 6.2832); ctx.fill();
+          ctx.fillStyle="#fff"; ctx.font="bold "+(CELL*0.26)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+          ctx.fillText("⇄", FX+bw/2+CELL*0.10, FY-bh/2-CELL*0.10+0.5);
+          ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
+          ctx.fillStyle="rgba(60,44,12,.98)"; ctx.fillText(nm,FX,FY+0.5);
+        }else{
+          ctx.fillStyle="#fff";
+          ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.9)"; ctx.lineWidth=Math.max(1.8,CELL*0.09);
+          roundRect(FX-bw/2, FY-bh/2, bw, bh, CELL*0.20); ctx.fill(); ctx.stroke();
+          ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
+          ctx.fillStyle="rgba(26,26,32,.97)"; ctx.fillText(nm,FX,FY+0.5);
+        }
       }
       continue;
     }
@@ -692,35 +824,30 @@ function draw(a){
       var ix=p.x+rel(c.x,p.x,WCOLS)*alpha, iy=p.y+rel(c.y,p.y,WROWS)*alpha;
       pts.push({x:sx(ix),y:sy(iy)});
     }
-    var seg=[pts[0]];
-    for(k=1;k<pts.length;k++){
-      var d=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
-      if(d>CELL*1.8){ strokeSeg(seg,sn.color,sn.isPlayer); seg=[]; }
-      seg.push(pts[k]);
-    }
-    strokeSeg(seg,sn.color,sn.isPlayer);
-    // 身体文字：文字版写 chars；地铁版把「已吃站名」拆成单字、沿蛇身逐节排一个字（像以前一样按字分布）
-    if(THEME.kind==="text" || THEME.kind==="metro"){
-      ctx.textAlign="center"; ctx.textBaseline="middle";
-      var metroFlat=null;
-      if(THEME.kind==="metro"){
-        metroFlat=[];
-        for(var b=0;b<sn.body.length;b++){ var _nm=(sn.body[b]&&sn.body[b].name)||""; for(var ci=0;ci<_nm.length;ci++) metroFlat.push(_nm[ci]); }
-      }
+    if(THEME.kind==="metro"){
+      // 地铁版图：细轨 + 站点圆点 + 全名（o积水潭o安定门o鼓楼大街 风格）
+      drawMetroTrack(pts, sn);
       for(k=1;k<pts.length;k++){
         var TX=pts[k].x, TY=pts[k].y;
         if(TX<-CELL||TY<-CELL||TX>S+CELL||TY>SH+CELL) continue;
-        if(THEME.kind==="text"){
-          var label=THEME.chars[k % THEME.chars.length];
-          ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',serif";
-          ctx.fillStyle="rgba(255,255,255,.95)"; ctx.fillText(label,TX,TY+0.5);
-        } else {
-          var ch=metroFlat?metroFlat[k-1]:null;          // 第 k 节 = 第 k 个站名单字
-          if(!ch) continue;
-          ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',sans-serif";
-          ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.strokeText(ch,TX,TY+0.5);
-          ctx.fillStyle="rgba(28,28,34,.97)"; ctx.fillText(ch,TX,TY+0.5);
-        }
+        drawStationNode(TX,TY, (sn.body[k]&&sn.body[k].name)||null, sn.color, k);
+      }
+    } else {
+      // 文字版：粗线蛇身 + 每节一个 char
+      var seg=[pts[0]];
+      for(k=1;k<pts.length;k++){
+        var d=Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y);
+        if(d>CELL*1.8){ strokeSeg(seg,sn.color,sn.isPlayer); seg=[]; }
+        seg.push(pts[k]);
+      }
+      strokeSeg(seg,sn.color,sn.isPlayer);
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      for(k=1;k<pts.length;k++){
+        var TX2=pts[k].x, TY2=pts[k].y;
+        if(TX2<-CELL||TY2<-CELL||TX2>S+CELL||TY2>SH+CELL) continue;
+        var label=THEME.chars[k % THEME.chars.length];
+        ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',serif";
+        ctx.fillStyle="rgba(255,255,255,.95)"; ctx.fillText(label,TX2,TY2+0.5);
       }
     }
     // 头
@@ -744,6 +871,12 @@ function draw(a){
       ctx.font="10px sans-serif"; ctx.textAlign="center";
       ctx.fillStyle=sn.isPlayer?sn.color:"rgba(70,66,60,.85)";
       ctx.fillText(sn.name, H.x, H.y-CELL*0.52);
+      if(THEME.kind==="metro" && sn.body[0] && sn.body[0].name){
+        ctx.font="bold "+(CELL*0.30)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.lineWidth=2.4; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(sn.body[0].name, H.x, H.y-CELL*0.86);
+        ctx.fillStyle="rgba(28,28,34,.98)"; ctx.fillText(sn.body[0].name, H.x, H.y-CELL*0.86);
+      }
       if(sn.isPlayer && sn.homeGlow>0){
         ctx.font="bold "+(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',sans-serif";
         ctx.fillStyle="rgba(217,164,65,.98)";
@@ -767,6 +900,25 @@ function draw(a){
     ctx.fillText("加速中", S-8, 8);
   }
   if(hitFlash>0){ ctx.fillStyle="rgba(200,50,30,"+(0.30*hitFlash)+")"; ctx.fillRect(0,0,S,SH); }
+  // 地铁版：蛇头靠近「换乘枢纽」时，底部居中提示「可换哪几条线」（帮助记忆线网骨架）
+  if(THEME.kind==="metro" && player && player.alive && player.body[0]){
+    var ph=player.body[0], hub=null;
+    for(i=0;i<food.length;i++){
+      var f=food[i];
+      if(f.transfer && Math.abs(f.x-ph.x)<=1 && Math.abs(f.y-ph.y)<=1){ hub=f; break; }
+    }
+    if(hub){
+      ctx.textAlign="center"; ctx.textBaseline="top";
+      ctx.font="bold "+(CELL*0.50)+"px 'STKaiti','KaiTi','楷体',serif";
+      var msg="换乘枢纽 · "+hub.name+" ｜ 可换 "+hub.transfer.join(" / ");
+      var bw2=ctx.measureText(msg).width+26, bh2=CELL*0.84;
+      var by=SH-CELL*0.9-bh2;
+      ctx.fillStyle="rgba(247,215,116,.97)";
+      ctx.strokeStyle="#caa23a"; ctx.lineWidth=2;
+      roundRect(S/2-bw2/2, by, bw2, bh2, 12); ctx.fill(); ctx.stroke();
+      ctx.fillStyle="rgba(60,44,12,.98)"; ctx.fillText(msg, S/2, by+CELL*0.18);
+    }
+  }
   drawMini();
 }
 
@@ -1003,6 +1155,10 @@ function togglePause(){
 }
 function startGame(){
   reset(); running=true; paused=false; camInit=false; hitFlash=0;
+  // 切换线路 / 切换城市：仅地铁版显示
+  var slb=document.getElementById("switchLineBtn"); if(slb) slb.style.display=(THEME.kind==="metro")?"":"none";
+  var mc=0; for(var _k in THEMES){ if(THEMES[_k].kind==="metro") mc++; }
+  var scb=document.getElementById("switchCityBtn"); if(scb) scb.style.display=(THEME.kind==="metro"&&mc>1)?"":"none";
   lastTick=performance.now(); lastTime=lastTick; alpha=0;
   document.getElementById("pauseBtn").textContent="暂停";
   startOverlay.classList.add("hidden"); pauseOverlay.classList.add("hidden"); deadOverlay.classList.add("hidden");
@@ -1033,6 +1189,45 @@ function setAuto(on){
   if(on) b.classList.add("on"); else b.classList.remove("on");
 }
 document.getElementById("autoBtn").addEventListener("click",function(){ setAuto(!autoMode); });
+
+/* 切换线路 / 切换城市（地铁版） */
+function openLinePicker(){
+  var grid=document.getElementById("lineGrid"); grid.innerHTML="";
+  document.getElementById("pickerTitle").textContent="选择线路（"+THEME.label+"）";
+  for(var i=0;i<THEME.lines.length;i++){
+    (function(idx){
+      var L=THEME.lines[idx];
+      var b=document.createElement("button");
+      b.className="line-chip"+(idx===playerLineIdx?" cur":"");
+      b.innerHTML='<span class="sw" style="background:'+L.color+'"></span>'+L.name;
+      b.addEventListener("click",function(){ playerLineIdx=idx; document.getElementById("linePicker").classList.add("hidden"); startGame(); });
+      grid.appendChild(b);
+    })(i);
+  }
+  document.getElementById("linePicker").classList.remove("hidden");
+}
+function openCityPicker(){
+  var grid=document.getElementById("lineGrid"); grid.innerHTML="";
+  document.getElementById("pickerTitle").textContent="选择城市";
+  var keys=Object.keys(THEMES).filter(function(k){return THEMES[k].kind==="metro";});
+  for(var i=0;i<keys.length;i++){
+    (function(key){
+      var t=THEMES[key];
+      var b=document.createElement("button");
+      b.className="line-chip"+(key===THEME.id?" cur":"");
+      b.innerHTML='<span class="sw" style="background:'+(t.lines[0]?t.lines[0].color:"#888")+'"></span>'+t.label;
+      b.addEventListener("click",function(){
+        try{ history.replaceState(null,"",location.pathname+"?theme="+key); }catch(e){}
+        location.search="?theme="+key;
+      });
+      grid.appendChild(b);
+    })(keys[i]);
+  }
+  document.getElementById("linePicker").classList.remove("hidden");
+}
+document.getElementById("switchLineBtn").addEventListener("click",openLinePicker);
+document.getElementById("switchCityBtn").addEventListener("click",openCityPicker);
+document.getElementById("linePickerClose").addEventListener("click",function(){ document.getElementById("linePicker").classList.add("hidden"); });
 
 /* 全屏：CSS 撑满（在 iframe 预览里也生效）+ 原生全屏 API 增强 */
 var orientLocked=false, forceRotate=false;
