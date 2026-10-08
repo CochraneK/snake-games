@@ -123,6 +123,7 @@
 
   <div class="hud">
     <div>长度 <b id="score">0</b></div>
+    <div id="nextWrap" style="display:none">下一站 <b id="nextSt">—</b></div>
     <div>最长 <b id="best">0</b></div>
     <div>排名 <b id="rank">-</b></div>
     <div id="homeWrap">家园 <b id="home">0/0</b></div>
@@ -229,18 +230,18 @@ const THEMES = {
     intro:"吃<b>发光豆子</b>变长，长度就是分数。<br>蛇身是一条「苏络苏络…」的字链，<br>撞到对手只<b>掉三节肉</b>（不会死），肉会变成豆子被抢。<br><b>手机：按住拖动转向，连点两下加速；点「全屏」按钮可横屏铺满</b>",
     bestKey:"suluo_best"
   },
-  cc: {
-    id:"cc", label:"CC", kind:"text",
-    title:"CC 贪吃蛇 · 开放世界",
-    foot:"CC · C Snaker",
-    chars:["C","c"],
-    foodChars:["C","c"],
-    playerName:"你·CC",
-    botNames:["小C","阿c","西西","C哥","c妹","CC君"],
+  "77": {
+    id:"77", label:"77", kind:"text",
+    title:"77 贪吃蛇 · 开放世界",
+    foot:"77 · 77 Snake",
+    chars:["7","7"],
+    foodChars:["7","7"],
+    playerName:"你·77",
+    botNames:["小七","阿七","七七","七哥","七妹","77君"],
     playerColor:"#1f6f6b",
     botColors:["#c0563a","#7a5cc9","#3a8fc0","#c9a23a","#3ac97a","#c93a8f"],
-    intro:"吃<b>发光豆子</b>变长，长度就是分数。<br>蛇身是一条「CcCc…」的字链，<br>撞到对手只<b>掉三节肉</b>（不会死），肉会变成豆子被抢。<br><b>手机：按住拖动转向，连点两下加速；点「全屏」按钮可横屏铺满</b>",
-    bestKey:"cc_best"
+    intro:"吃<b>发光豆子</b>变长，长度就是分数。<br>蛇身是一条「7777…」的字链，<br>撞到对手只<b>掉三节肉</b>（不会死），肉会变成豆子被抢。<br><b>手机：按住拖动转向，连点两下加速；点「全屏」按钮可横屏铺满</b>",
+    bestKey:"77_best"
   },
   beijing: {
     id:"beijing", label:"北京地铁", kind:"metro",
@@ -252,7 +253,7 @@ const THEMES = {
       {name:"2号线",  color:"#006098", stations:["西直门","积水潭","鼓楼大街","安定门","雍和宫","东直门","东四十条","朝阳门","建国门","北京站","崇文门","前门","和平门","宣武门","长椿街","复兴门","阜成门","车公庄"]},
       {name:"4号线",  color:"#008E9C", stations:["安河桥北","北宫门","西苑","圆明园","北京大学东门","中关村","海淀黄庄","人民大学","魏公村","国家图书馆","动物园","西直门","新街口","平安里","西四","灵境胡同","西单","宣武门","菜市口","陶然亭","北京南站","马家堡","角门西","公益西桥","新宫","西红门","高米店北","高米店南","枣园","清源路","黄村西大街","黄村火车站","义和庄","生物医药基地","天宫院"]},
       {name:"5号线",  color:"#A5115A", stations:["天通苑北","天通苑","天通苑南","立水桥","立水桥南","北苑路北","大屯路东","惠新西街北口","惠新西街南口","和平西桥","和平里北街","雍和宫","北新桥","张自忠路","东四","灯市口","东单","崇文门","磁器口","天坛东门","蒲黄榆","刘家窑","宋家庄"]},
-      {name:"6号线",  color:"#D09C0A", stations:["金安桥","苹果园","杨庄","西黄村","廖公庄","田村","海淀五路居","慈寿寺","花园桥","白石桥南","二里沟","车公庄西","车公庄","平安里","北海北","南锣鼓巷","东四","朝阳门","东大桥","呼家楼","金台路","十里堡","青年路","褡裢坡","黄渠","常营","草房","物资学院路","通州北关","通运门","北运河西","北运河东","郝家府","东夏园","潞城"]},
+      {name:"6号线",  color:"#D09C0A", stations:["金安桥","苹果园","杨庄","西黄村","廖公庄","田村","海淀五路居","慈寿寺","花园桥","白石桥南","二里沟","车公庄西","车公庄","平安里","北海北","南锣鼓巷","东四","朝阳门","东大桥","呼家楼","金台路","十里堡","青年路","褡裢坡","黄渠","常营","草房","物资学院路","通州北关","通运门","北运河西","北运河东","郝家府","东夏园","潞城","潞阳"]},
       {name:"7号线",  color:"#F3D600", stations:["北京西站","湾子","达官营","广安门内","菜市口","虎坊桥","珠市口","桥湾","磁器口","广渠门内","广渠门外","双井","九龙山","大郊亭","百子湾","化工","南楼梓庄","欢乐谷景区","垡头","双合","焦化厂","黄厂","郎辛庄","黑庄户","万盛西","万盛东","群芳","高楼金","花庄","环球度假区"]},
       {name:"8号线",  color:"#009C5B", stations:["朱辛庄","育知路","平西府","回龙观东大街","霍营","育新","西小口","永泰庄","林萃桥","森林公园南门","奥林匹克公园","奥体中心","北土城","安华桥","安德里北街","鼓楼大街","什刹海","南锣鼓巷","中国美术馆","金鱼胡同","王府井","前门","珠市口","天桥","永定门外","木樨园","海户屯","大红门","大红门南","和义","东高地","火箭万源","五福堂","德茂","瀛海"]},
       {name:"10号线", color:"#009ACA", stations:["巴沟","苏州街","海淀黄庄","知春里","知春路","西土城","牡丹园","健德门","北土城","安贞门","惠新西街南口","芍药居","太阳宫","三元桥","亮马桥","农业展览馆","团结湖","呼家楼","金台夕照","国贸","双井","劲松","潘家园","十里河","分钟寺","成寿寺","宋家庄","石榴庄","大红门","角门东","角门西","草桥","纪家庙","首经贸","丰台站","泥洼","西局","六里桥","莲花桥","公主坟","西钓鱼台","慈寿寺","车道沟","长春桥","火器营"]},
@@ -264,8 +265,8 @@ const THEMES = {
       {name:"12号线", color:"#7A5C3E", stations:["四季青桥","蓝靛厂","长春桥","苏州桥","人民大学","大钟寺","蓟门桥","北太平庄","马甸桥","安华桥","和平西桥","光熙门","西坝河","三元桥","将台西","高家园","驼房营","北岗子","东坝","东坝北"]},
       {name:"15号线", color:"#9C4B9C", stations:["清华东路西口","六道口","北沙滩","奥林匹克公园","安立路","大屯路东","关庄","望京西","望京","望京东","崔各庄","马泉营","孙河","国展","花梨坎","后沙峪","南法信","石门","顺义","俸伯"]},
       {name:"16号线", color:"#2E9E5B", stations:["北安河","温阳路","稻香湖路","屯佃","永丰","永丰南","西北旺","马连洼","农大南路","西苑","万泉河桥","苏州街","苏州桥","万寿寺","国家图书馆","二里沟","甘家口","玉渊潭东门","木樨地","达官营","红莲南路","丽泽商务区","东管头南","丰台站","丰台南路","富丰桥","看丹","榆树庄","宛平城"]},
-      {name:"17号线", color:"#00A09A", stations:["未来科学城北","未来科学城","天通苑东","清河营","红军营","太阳宫","西坝河","工人体育场","北新桥","永安里","广渠门外","周家庄","十八里店","北神树","次渠北","次渠","嘉会湖"]},
-      {name:"18号线", color:"#5B5BD6", stations:["马连洼","海淀郊野公园","软件园","清河","上清桥","志新桥","北沙滩","奥体中心","安贞桥","东大桥","天通苑东"]},
+      {name:"17号线", color:"#00A09A", stations:["未来科学城北","未来科学城","天通苑东","清河营","红军营","太阳宫","西坝河","工人体育场","东大桥","永安里","广渠门外","潘家园西","十里河","周家庄","十八里店","北神树","次渠北","次渠","嘉会湖"]},
+      {name:"18号线", color:"#5B5BD6", stations:["马连洼","上地软件园","东北旺","龙泽西","回龙观西大街","文华路","回龙观东大街","霍营东","天通苑","太平庄","天通苑东"]},
       {name:"19号线", color:"#A8446E", stations:["新宫","新发地","草桥","景风门","牛街","太平桥","金融街","平安里","北太平庄","牡丹园"]},
       {name:"亦庄线",  color:"#E4007F", stations:["宋家庄","肖村","小红门","旧宫","亦庄桥","亦庄文化园","万源街","荣京东街","荣昌东街","同济南路","经海路","次渠","次渠南","亦庄火车站"]},
       {name:"房山线",  color:"#B11E2D", stations:["阎村东","紫草坞","阎村","大石河东","马各庄","饶乐府","良乡大学城西","良乡大学城","良乡大学城北","广阳城","篱笆房","长阳","稻田","大葆台","郭公庄","首经贸","东管头南"]},
@@ -307,6 +308,7 @@ const THEMES = {
     bestKey:"nanjing_best"
   }
 };
+THEMES.cc=THEMES["77"];   // 旧链接 ?theme=cc 兼容，指向 77 版本
 function pickTheme(){
   try{ var id=new URLSearchParams(location.search).get("theme"); if(id&&THEMES[id]) return THEMES[id]; }catch(e){}
   return THEMES.su;
@@ -340,6 +342,14 @@ if(THEME.kind==="metro"){
 }
 function pickStation(){
   if(!STATION_POOL.length) return {name:"站",line:"",color:"#888"};
+  // 地铁版：45% 概率出「玩家当前线路」的车站。
+  // 否则全网几百个站里几乎刷不到本线下一站，「按真实站序建设家园」这个核心玩法实际玩不起来。
+  if(THEME.kind==="metro" && player && player.homeLine && Math.random()<0.45){
+    var L=player.homeLine, n=L.stations[rnd(L.stations.length)], pool=[], q;
+    for(q=0;q<STATION_POOL.length;q++) if(STATION_POOL[q].name===n) pool.push(STATION_POOL[q]);
+    if(pool.length) return pool[(Math.random()*pool.length)|0];
+    return {name:n, line:L.name, color:L.color};
+  }
   return STATION_POOL[(Math.random()*STATION_POOL.length)|0];
 }
 
@@ -382,10 +392,15 @@ bestEl.textContent=best;
 const clamp=function(v,a,b){return v<a?a:(v>b?b:v);};
 function rel(v,cam,n){ var d=(v-cam)%n; if(d>n/2)d-=n; if(d<-n/2)d+=n; return d; }
 function rnd(n){ return (Math.random()*n)|0; }
-function mkFood(x,y,value){
+function mkFood(x,y,value,forceName){
   if(THEME.kind==="metro"){
     // 地铁版：食物是「真实车站」（白底圆角 + 线路色环 + 站名）；撞掉的肉也是车站
-    var s=pickStation();
+    var s;
+    if(forceName){
+      // 指定站名：用于保证玩家「下一站」一定出现在地图上
+      s={name:forceName, line:(player&&player.homeLine)?player.homeLine.name:"",
+         color:(player&&player.homeLine)?player.homeLine.color:"#888"};
+    }else s=pickStation();
     var tr=TRANSFER[s.name];
     // 换乘站：出现在 ≥2 条线 → 标为金色枢纽，并附「可换线路」列表（帮助记忆线网）
     return {x:x,y:y,station:true,name:s.name,line:s.line,lcolor:s.color,
@@ -449,6 +464,19 @@ function spawnFood(n){
     occ[c.x+","+c.y]=1;
     food.push(mkFood(c.x,c.y,1));
   }
+}
+/* 地铁版：保证玩家「下一站」在地图上至少有一个。
+   否则玩家根本不知道该去找哪个站，「按真实站序收集本线站点」的记忆目的就落空了。 */
+function ensureNextStation(){
+  if(THEME.kind!=="metro"||!player||!player.alive||!player.homeLine) return;
+  if(!player.body||!player.body[0]) return;
+  var st=player.homeLine.stations, idx=player.nextHomeIdx||0;
+  if(idx>=st.length) return;
+  var want=st[idx], i;
+  for(i=0;i<food.length;i++) if(food[i].name===want) return;   // 已存在，不用补
+  var occ=occSet(), c, g=0, h=player.body[0];
+  do{ c={x:(h.x+rnd(11)-5+WCOLS)%WCOLS, y:(h.y+rnd(11)-5+WROWS)%WROWS}; g++; }while(occ[c.x+","+c.y]&&g<80);
+  food.push(mkFood(c.x,c.y,1,want));
 }
 function spawnSnake(o){
   var len=o.len||START_LEN;
@@ -633,6 +661,7 @@ function tick(now){
   for(i=0;i<snakes.length;i++) moveSnake(snakes[i],now);
   if(player && player.alive && player.boosting) moveSnake(player,now);
   if(food.length<FOOD_TARGET) spawnFood(FOOD_TARGET-food.length);
+  ensureNextStation();   // 地铁版：保证「下一站」始终出现在地图上
   updateBoard();
 }
 
@@ -759,6 +788,8 @@ function draw(a){
     if(THEME.kind==="metro"){
       // 真实车站：白底圆角 + 线路色环 + 站名（每个字/站是一个食物）
       var isHub=!!f.transfer;
+      // 「下一站」= 玩家当前线路按真实站序该吃的下一个站
+      var isNext=(player&&player.homeLine&&f.name&&f.name===player.homeLine.stations[player.nextHomeIdx||0]);
       var ss=CELL*0.34;
       if(isHub){   // 换乘枢纽：金色底座
         ctx.fillStyle="#f7d774";
@@ -797,6 +828,18 @@ function draw(a){
           ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
           ctx.fillStyle="rgba(26,26,32,.97)"; ctx.fillText(nm,FX,FY+0.5);
         }
+      }
+      // 「下一站」高亮：金色脉冲环 + 角标，让玩家一眼看到该吃哪个站
+      if(isNext){
+        var pr=CELL*0.62+CELL*0.10*pulse;
+        ctx.strokeStyle="rgba(217,164,65,.98)"; ctx.lineWidth=Math.max(3,CELL*0.14);
+        ctx.beginPath(); ctx.arc(FX,FY,pr,0,6.2832); ctx.stroke();
+        ctx.font="bold "+(CELL*0.30)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+        ctx.textAlign="center"; ctx.textBaseline="bottom";
+        var lb="下一站", lw2=ctx.measureText(lb).width+CELL*0.22, lh2=CELL*0.38;
+        ctx.fillStyle="rgba(217,164,65,.98)";
+        roundRect(FX-lw2/2, FY-pr-lh2-CELL*0.08, lw2, lh2, CELL*0.14); ctx.fill();
+        ctx.fillStyle="rgba(255,255,255,.98)"; ctx.fillText(lb, FX, FY-pr-CELL*0.08);
       }
       continue;
     }
@@ -973,6 +1016,13 @@ function updateHome(){
   var h=computeHome(player);
   homeEl.textContent=h.built+"/"+h.total;
   if(hpCountEl) hpCountEl.textContent=h.built+"/"+h.total;
+  // HUD「下一站」：即使目标不在视野内，也知道该去找哪个站
+  var st=player.homeLine.stations, idx=player.nextHomeIdx||0;
+  var nwEl=document.getElementById("nextWrap"), nsEl=document.getElementById("nextSt");
+  if(nwEl&&nsEl){
+    nsEl.textContent = (idx<st.length) ? st[idx] : "全线建满";
+    nwEl.style.display="";
+  }
 }
 /* 地铁版左下角图示：10 条线路逐条「点亮」（循环高亮当前线） */
 function startLineHi(){

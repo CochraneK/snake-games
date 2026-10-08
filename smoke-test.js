@@ -93,13 +93,14 @@ function drive(sandbox, frames) {
 
 const expect = {
   su: "苏络贪吃蛇 · 开放世界",
-  cc: "CC 贪吃蛇 · 开放世界",
+  "77": "77 贪吃蛇 · 开放世界",
+  cc: "77 贪吃蛇 · 开放世界",   // 旧链接 ?theme=cc 兼容指向 77
   beijing: "北京地铁贪吃蛇 · 开放世界",
   nanjing: "南京地铁贪吃蛇 · 开放世界"
 };
 
 let ok = true;
-for (const theme of ["su", "cc", "beijing", "nanjing"]) {
+for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
   const sb = makeSandbox(theme);
   try {
     vm.runInNewContext(src, sb, { filename: "play.html" });
@@ -139,7 +140,7 @@ for (const theme of ["su", "cc", "beijing", "nanjing"]) {
 console.log(ok ? "\nALL PASS" : "\nSOME FAILED");
 
 /* verify metro data yields transfer hubs — the engine derives TRANSFER (gold hubs) from this */
-const tm = html.match(/const THEMES = (\{[\s\S]*?\n\});\s*\nfunction pickTheme/);
+const tm = html.match(/const THEMES = (\{[\s\S]*?\n\});[\s\S]*?function pickTheme/);
 if (!tm) { console.error("FAIL could not locate THEMES literal"); ok = false; }
 else {
   const THEMES = vm.runInNewContext("(" + tm[1] + ")", {});
