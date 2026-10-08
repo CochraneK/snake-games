@@ -317,15 +317,24 @@ const THEME = pickTheme();
 var playerLineIdx=0;   // 地铁版：玩家当前所玩线路（切换线路用）
 
 /* —— 地铁版：真实站名池 + 每条蛇的「家园」线路 —— */
+/* 地铁版：每一条线路都有一条蛇出战。
+   玩家占 playerLineIdx 那条线，其余线路各配一条 AI 蛇（跳过玩家所占的线，避免撞线） */
+function botLineIdx(i){
+  var n=THEME.lines.length; if(n<2) return 0;
+  var k=i%(n-1);
+  return k<playerLineIdx ? k : k+1;
+}
 function homeLineFor(id,isPlayer){
   if(THEME.kind!=="metro") return null;
-  if(isPlayer) return THEME.lines[playerLineIdx];            // 玩家当前所选线路（切换线路可改）
-  return THEME.lines[1 + ((id-1) % (THEME.lines.length-1))];
+  if(isPlayer) return THEME.lines[playerLineIdx];   // 玩家当前所选线路（切换线路可改）
+  return THEME.lines[botLineIdx(id-1)];             // 其余每条线各一条蛇
 }
 var STATION_POOL=[];
+var LINE_COLOR={};      // 线路名 -> 线路色（蛇身上区分「本线站」与「别线站」）
 if(THEME.kind==="metro"){
   for(var _li=0;_li<THEME.lines.length;_li++){
     var _L=THEME.lines[_li];
+    LINE_COLOR[_L.name]=_L.color;
     for(var _si=0;_si<_L.stations.length;_si++){
       STATION_POOL.push({name:_L.stations[_si], line:_L.name, color:_L.color});
     }
@@ -359,7 +368,7 @@ function playerDef(){
   return {name:THEME.playerName,color:THEME.playerColor};
 }
 function botDef(i){
-  if(THEME.kind==="metro"){ var L=THEME.lines[1+(i% (THEME.lines.length-1))]; return {name:L.name,color:L.color}; }
+  if(THEME.kind==="metro"){ var L=THEME.lines[botLineIdx(i)]; return {name:L.name,color:L.color}; }
   return {name:THEME.botNames[i%THEME.botNames.length], color:THEME.botColors[i%THEME.botColors.length]};
 }
 
@@ -494,7 +503,9 @@ function reset(){
   player=spawnSnake({id:0,name:pd.name,color:pd.color,isPlayer:true});
   player.homeLine=homeLineFor(0,true);
   snakes.push(player);
-  for(var i=0;i<BOT_COUNT;i++){ var d=botDef(i);
+  // 地铁版：每条线路都有一条蛇（全线网出战）；文字版仍是固定 BOT_COUNT 个对手
+  var nBots=(THEME.kind==="metro")?(THEME.lines.length-1):BOT_COUNT;
+  for(var i=0;i<nBots;i++){ var d=botDef(i);
     var bs=spawnSnake({id:i+1,name:d.name,color:d.color,len:BOT_START_LEN});
     bs.homeLine=homeLineFor(i+1,false);
     snakes.push(bs); }
@@ -721,19 +732,24 @@ function drawMetroTrack(pts, sn){
   ctx.stroke();
   ctx.restore();
 }
-/* 地铁版站点节点：线路色圆点 + 白环 + 全名（上下交错防挤） */
-function drawStationNode(x,y,name,color,k){
-  var r=CELL*0.30;
+/* 地铁版站点节点：线路色圆点 + 白环 + 全名（上下交错防挤）
+   mine=true = 这一站属于「本蛇当前线路」→ 画大、画亮；
+   mine=false = 吃到的是别条线的站 → 画小、灰字。这样一眼能看出当前线路那一段。 */
+function drawStationNode(x,y,name,color,k,mine){
+  if(mine===undefined) mine=true;
+  var r=mine?CELL*0.32:CELL*0.21;
   ctx.beginPath(); ctx.arc(x,y,r,0,6.2832);
-  ctx.fillStyle=color; ctx.fill();
-  ctx.lineWidth=Math.max(1.6,CELL*0.08); ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.stroke();
+  ctx.fillStyle=mine?color:"rgba(150,144,134,.80)"; ctx.fill();
+  ctx.lineWidth=Math.max(1.4,CELL*(mine?0.09:0.06));
+  ctx.strokeStyle=mine?"rgba(255,255,255,.97)":"rgba(255,255,255,.75)"; ctx.stroke();
   if(!name) return;
-  var fs=Math.max(CELL*0.20, Math.min(CELL*0.34, Math.floor(CELL*0.92/name.length)));
+  var fs=Math.max(CELL*0.20, Math.min(mine?CELL*0.34:CELL*0.24, Math.floor(CELL*0.92/name.length)));
   ctx.font="bold "+fs+"px 'STKaiti','KaiTi','楷体',sans-serif";
   ctx.textAlign="center"; ctx.textBaseline="middle";
   var oy=(k%2===0)? -r-CELL*0.40 : r+CELL*0.44;
-  ctx.lineWidth=2.4; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(name,x,y+oy);
-  ctx.fillStyle="rgba(28,28,34,.98)"; ctx.fillText(name,x,y+oy);
+  ctx.lineWidth=mine?2.4:1.8;
+  ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(name,x,y+oy);
+  ctx.fillStyle=mine?"rgba(28,28,34,.98)":"rgba(126,120,110,.95)"; ctx.fillText(name,x,y+oy);
 }
 
 function strokeSeg(arr,color,isPlayer){
@@ -873,7 +889,11 @@ function draw(a){
       for(k=1;k<pts.length;k++){
         var TX=pts[k].x, TY=pts[k].y;
         if(TX<-CELL||TY<-CELL||TX>S+CELL||TY>SH+CELL) continue;
-        drawStationNode(TX,TY, (sn.body[k]&&sn.body[k].name)||null, sn.color, k);
+        var sg=sn.body[k];
+        // 本线站：线路色、画大画亮；别线站：用该站所属线路的颜色、画小灰字 → 突出当前线路
+        var segMine=!!(sg&&sg.line&&sn.homeLine&&sg.line===sn.homeLine.name);
+        var segColor=(sg&&sg.line&&LINE_COLOR[sg.line])?LINE_COLOR[sg.line]:sn.color;
+        drawStationNode(TX,TY,(sg&&sg.name)||null, segMine?sn.color:segColor, k, segMine);
       }
     } else {
       // 文字版：粗线蛇身 + 每节一个 char
@@ -992,11 +1012,17 @@ function updateBoard(){
   rankEl.textContent=(sorted.indexOf(player)+1)+"/"+snakes.length;
   boardEl.innerHTML="";
   var medals=["①","②","③","④","⑤","⑥","⑦"];
-  for(var i=0;i<sorted.length;i++){
-    var sn=sorted[i];
+  // 地铁版每条线一条蛇（北京 28 条），全列出来会挤爆 —— 只显示前列 + 玩家，名次仍按全体计算
+  var show=sorted, MAXC=8;
+  if(sorted.length>MAXC+2){
+    show=sorted.slice(0,MAXC);
+    if(player && show.indexOf(player)<0) show=show.concat([player]);
+  }
+  for(var i=0;i<show.length;i++){
+    var sn=show[i], rk=sorted.indexOf(sn);
     var c=document.createElement("div");
     c.className="chip"+(sn.isPlayer?" me":"")+(sn.alive?"":" dead");
-    c.innerHTML=(medals[i]||(i+1)+".")+sn.name+"<span class='sc'>"+sn.score+"</span>";
+    c.innerHTML=(medals[rk]||(rk+1)+".")+sn.name+"<span class='sc'>"+sn.score+"</span>";
     boardEl.appendChild(c);
   }
   updateHome();

@@ -11,6 +11,11 @@ const m = html.match(/<script>([\s\S]*?)<\/script>/);
 if (!m) { console.error("FAIL: no <script> found"); process.exit(1); }
 const src = m[1];
 
+/* parse the THEMES literal out of the page so tests can assert against the real data */
+const tm = html.match(/const THEMES = (\{[\s\S]*?\n\});[\s\S]*?function pickTheme/);
+if (!tm) { console.error("FAIL: could not locate THEMES literal"); process.exit(1); }
+const THEMES = vm.runInNewContext("(" + tm[1] + ")", {});
+
 function ctxProxy() {
   const grad = { addColorStop() {} };
   return new Proxy({}, {
@@ -126,6 +131,17 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     console.error("FAIL [" + theme + "] player score " + score + " < 8 (did not survive/grow in open mode)");
     ok = false;
   }
+  // metro: every line must have its own snake (全线网出战), text modes = player + 6 bots
+  const T = THEMES[theme] || THEMES["77"];
+  const wantSnakes = T.kind === "metro" ? T.lines.length : 7;
+  const rankTxt = String(sb.__els["rank"].textContent || "");
+  const total = parseInt(rankTxt.split("/")[1], 10);
+  if (total !== wantSnakes) {
+    console.error("FAIL [" + theme + "] snakes=" + total + " expected " + wantSnakes + " (rank=" + rankTxt + ")");
+    ok = false;
+  } else {
+    console.log("  [" + theme + "] snakes on board: " + total + (T.kind === "metro" ? " (one per line)" : ""));
+  }
   // landscape bitmap ratio (the stretch-bug guard)
   const g = sb.__els["game"];
   g.clientWidth = 800; g.clientHeight = 400;
@@ -140,19 +156,14 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
 console.log(ok ? "\nALL PASS" : "\nSOME FAILED");
 
 /* verify metro data yields transfer hubs — the engine derives TRANSFER (gold hubs) from this */
-const tm = html.match(/const THEMES = (\{[\s\S]*?\n\});[\s\S]*?function pickTheme/);
-if (!tm) { console.error("FAIL could not locate THEMES literal"); ok = false; }
-else {
-  const THEMES = vm.runInNewContext("(" + tm[1] + ")", {});
-  for (const id of ["beijing", "nanjing"]) {
-    const T = THEMES[id];
-    const seen = {};
-    for (const L of T.lines) for (const s of L.stations) (seen[s] = seen[s] || new Set()).add(L.name);
-    let c = 0; const ex = [];
-    for (const s in seen) if (seen[s].size > 1) { c++; if (ex.length < 3) ex.push(s + "(" + [...seen[s]].join("/") + ")"); }
-    if (c === 0) { console.error("FAIL [" + id + "] no transfer hubs in data"); ok = false; }
-    else console.log("  [" + id + "] data transfer hubs: " + c + " (e.g. " + ex.join(" / ") + ")");
-  }
+for (const id of ["beijing", "nanjing"]) {
+  const T = THEMES[id];
+  const seen = {};
+  for (const L of T.lines) for (const s of L.stations) (seen[s] = seen[s] || new Set()).add(L.name);
+  let c = 0; const ex = [];
+  for (const s in seen) if (seen[s].size > 1) { c++; if (ex.length < 3) ex.push(s + "(" + [...seen[s]].join("/") + ")"); }
+  if (c === 0) { console.error("FAIL [" + id + "] no transfer hubs in data"); ok = false; }
+  else console.log("  [" + id + "] data transfer hubs: " + c + " (e.g. " + ex.join(" / ") + ")");
 }
 
 process.exit(ok ? 0 : 1);
