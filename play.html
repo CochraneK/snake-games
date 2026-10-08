@@ -28,7 +28,7 @@
   .chip.me{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:700;}
   .chip.dead{opacity:.45;text-decoration:line-through;}
   .chip .sc{font-weight:700;margin-left:3px;}
-  .stage{position:relative;width:min(97vw,760px);}
+  .stage{position:relative;width:min(97vw,920px);}
   canvas#game{width:100%;display:block;background:#f3eee3;border:2px solid var(--line);border-radius:10px;
     box-shadow:0 10px 28px rgba(60,50,30,.16),inset 0 0 0 5px rgba(255,255,255,.3);touch-action:none;}
   canvas#mini{position:absolute;right:7px;bottom:7px;width:88px;height:88px;border-radius:8px;
@@ -194,6 +194,14 @@
 const WCOLS=64, WROWS=64;
 const FOOD_TARGET=170;      // 常驻豆子更多，随处有得吃
 const BOT_COUNT=6;
+/* 视野缩放：格子尺寸自适应屏幕，保证「蛇看得清」。
+   以前 CELL 写死 30px → 屏幕越大格子越多、蛇越细（全屏 1920 宽能显示 64 列，蛇细成一条线）。
+   现在按「目标列数/行数」反推每格像素：屏幕越大，格子越大、蛇越粗。
+   想再大/再小，改 VIEW_TARGET_COLS（越小=格子越大）或 CELL_MIN/MAX 即可。 */
+const VIEW_TARGET_COLS=20;  // 视野目标横向格数
+const VIEW_TARGET_ROWS=14;  // 视野目标纵向格数
+const CELL_MIN=32;          // 每格最小像素（不能低于原来的 30，否则手机端反而变小、看不清）
+const CELL_MAX=90;          // 每格最大像素（4K 全屏也不会因为格子太多而变回细线）
 const TICK=150;              // 统一节奏：玩家与对手同速
 const BOOST_MS=1200;         // 双击/连点触发的一次冲刺时长
 const DOUBLE_TAP_MS=320;     // 双击判定窗口
@@ -474,7 +482,9 @@ function resize(){
   var cssH = canvas.clientHeight || cssW;   // 读实际布局尺寸（会触发回流）
   if(cssW<2 || cssH<2) return;
   lastCW=cssW; lastCH=cssH;
-  CELL = 30;                        // 固定每格像素，保证豆子里的字看得清
+  // 每格像素按屏幕自适应：目标是视野约 VIEW_TARGET_COLS × VIEW_TARGET_ROWS 格。
+  // 屏幕越大 → 格子越大 → 蛇越粗越看得清（以前写死 30px，大屏上蛇细得看不见）。
+  CELL = clamp(Math.min(cssW/VIEW_TARGET_COLS, cssH/VIEW_TARGET_ROWS), CELL_MIN, CELL_MAX);
   VCOLS = cssW/CELL; VROWS = cssH/CELL;
   VW = cssW; VH = cssH;
   // 位图尺寸必须严格等于 CSS 盒子尺寸，否则被非等比拉伸 → 横屏时字和圆豆会歪
