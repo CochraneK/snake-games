@@ -99,6 +99,14 @@
   .home-panel .st.on{background:var(--teal);color:#fff;border-color:var(--teal);}
   .home-panel .st.next{background:var(--gold);color:#3a2c00;border-color:#caa23a;
     box-shadow:0 0 0 2px rgba(217,164,65,.45);}
+  /* 地铁版左下角图示：10 条线路逐条「点亮」的图例 */
+  .home-panel .lp{display:flex;flex-direction:column;gap:3px;margin-top:5px;}
+  .home-panel .lp-row{display:flex;align-items:center;gap:6px;padding:1px 5px;border-radius:7px;opacity:.42;
+    transition:opacity .25s ease, background .25s ease, box-shadow .25s ease;}
+  .home-panel .lp-row.lit{opacity:1;background:rgba(217,164,65,.18);box-shadow:0 0 0 2px rgba(217,164,65,.55);}
+  .home-panel .lp-row.home{outline:1px dashed rgba(40,40,45,.45);}
+  .home-panel .lp-bar{width:14px;height:14px;border-radius:4px;flex:0 0 auto;box-shadow:0 0 0 1px rgba(0,0,0,.12) inset;}
+  .home-panel .lp-name{font-size:11px;color:var(--ink);white-space:nowrap;}
   body.fs .home-panel{max-height:62vh;}
   body.fs #homePanel{left:8px;bottom:8px;}
 </style>
@@ -283,7 +291,8 @@ const canvas=document.getElementById("game"), ctx=canvas.getContext("2d");
 const mini=document.getElementById("mini"), mctx=mini.getContext("2d");
 const dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1));
 const scoreEl=document.getElementById("score"), bestEl=document.getElementById("best"), rankEl=document.getElementById("rank");
-const homeEl=document.getElementById("home"), homePanel=document.getElementById("homePanel"); var homeChips=null;
+const homeEl=document.getElementById("home"), homePanel=document.getElementById("homePanel");
+var homeLineRows=null, hpCountEl=null, lineHiTimer=null, lineHiIdx=-1;
 const boardEl=document.getElementById("board");
 const startOverlay=document.getElementById("startOverlay"), pauseOverlay=document.getElementById("pauseOverlay"), deadOverlay=document.getElementById("deadOverlay");
 const pauseScoreEl=document.getElementById("pauseScore"), finalScoreEl=document.getElementById("finalScore"), killerNameEl=document.getElementById("killerName");
@@ -644,11 +653,18 @@ function draw(a){
       ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.85)"; ctx.lineWidth=Math.max(2,CELL*0.10);
       roundRect(FX-ss/2,FY-ss/2,ss,ss,CELL*0.12); ctx.fill(); ctx.stroke();
       if(f.name){
-        var nm=f.name, fs2=Math.max(8,Math.min(CELL*0.40,Math.floor(CELL*0.96/nm.length)));
-        ctx.font=fs2+"px 'STKaiti','KaiTi','楷体',sans-serif";
+        // 真实车站：白底圆角「票根」按站名尺寸自适应，站名放大加粗、白描边防糊
+        var nm=f.name;
+        var fs2=Math.max(CELL*0.22, Math.min(CELL*0.52, Math.floor(CELL*0.92/nm.length)));
+        ctx.font="bold "+fs2+"px 'STKaiti','KaiTi','楷体',sans-serif";
         ctx.textAlign="center"; ctx.textBaseline="middle";
-        ctx.lineWidth=2.2; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
-        ctx.fillStyle="rgba(30,30,35,.96)"; ctx.fillText(nm,FX,FY+0.5);
+        var tw=ctx.measureText(nm).width, padX=CELL*0.16, padY=CELL*0.07;
+        var bw=Math.max(tw+padX*2, CELL*0.62), bh=fs2+padY*2;
+        ctx.fillStyle="#fff";
+        ctx.strokeStyle=f.lcolor||"rgba(40,40,45,.9)"; ctx.lineWidth=Math.max(1.8,CELL*0.09);
+        roundRect(FX-bw/2, FY-bh/2, bw, bh, CELL*0.20); ctx.fill(); ctx.stroke();
+        ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(nm,FX,FY+0.5);
+        ctx.fillStyle="rgba(26,26,32,.97)"; ctx.fillText(nm,FX,FY+0.5);
       }
       continue;
     }
@@ -683,22 +699,27 @@ function draw(a){
       seg.push(pts[k]);
     }
     strokeSeg(seg,sn.color,sn.isPlayer);
-    // 身体文字：文字版写 chars；地铁版写「真实站名」（蛇身由吃掉的站名组成）
+    // 身体文字：文字版写 chars；地铁版把「已吃站名」拆成单字、沿蛇身逐节排一个字（像以前一样按字分布）
     if(THEME.kind==="text" || THEME.kind==="metro"){
       ctx.textAlign="center"; ctx.textBaseline="middle";
+      var metroFlat=null;
+      if(THEME.kind==="metro"){
+        metroFlat=[];
+        for(var b=0;b<sn.body.length;b++){ var _nm=(sn.body[b]&&sn.body[b].name)||""; for(var ci=0;ci<_nm.length;ci++) metroFlat.push(_nm[ci]); }
+      }
       for(k=1;k<pts.length;k++){
         var TX=pts[k].x, TY=pts[k].y;
         if(TX<-CELL||TY<-CELL||TX>S+CELL||TY>SH+CELL) continue;
-        var label = THEME.kind==="text" ? THEME.chars[k % THEME.chars.length] : (sn.body[k]?sn.body[k].name:null);
-        if(!label) continue;
         if(THEME.kind==="text"){
+          var label=THEME.chars[k % THEME.chars.length];
           ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',serif";
           ctx.fillStyle="rgba(255,255,255,.95)"; ctx.fillText(label,TX,TY+0.5);
         } else {
-          var fs3=Math.max(8,Math.min(CELL*0.42,Math.floor(CELL*0.95/label.length)));
-          ctx.font=fs3+"px 'STKaiti','KaiTi','楷体',sans-serif";
-          ctx.lineWidth=2.4; ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.strokeText(label,TX,TY+0.5);
-          ctx.fillStyle="rgba(35,35,40,.96)"; ctx.fillText(label,TX,TY+0.5);
+          var ch=metroFlat?metroFlat[k-1]:null;          // 第 k 节 = 第 k 个站名单字
+          if(!ch) continue;
+          ctx.font=(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',sans-serif";
+          ctx.lineWidth=2.6; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.strokeText(ch,TX,TY+0.5);
+          ctx.fillStyle="rgba(28,28,34,.97)"; ctx.fillText(ch,TX,TY+0.5);
         }
       }
     }
@@ -799,25 +820,42 @@ function updateHome(){
   if(THEME.kind!=="metro" || !player || !player.homeLine) return;
   var h=computeHome(player);
   homeEl.textContent=h.built+"/"+h.total;
-  if(homeChips){
-    for(var i=0;i<homeChips.length;i++){
-      homeChips[i].className="st"+(i<h.next?" on":(i===h.next?" next":""));
+  if(hpCountEl) hpCountEl.textContent=h.built+"/"+h.total;
+}
+/* 地铁版左下角图示：10 条线路逐条「点亮」（循环高亮当前线） */
+function startLineHi(){
+  if(lineHiTimer) return;
+  lineHiTimer=setInterval(function(){
+    if(THEME.kind!=="metro" || !homeLineRows || !homeLineRows.length) return;
+    lineHiIdx=(lineHiIdx+1)%homeLineRows.length;
+    for(var i=0;i<homeLineRows.length;i++){
+      homeLineRows[i].classList.toggle("lit", i===lineHiIdx);
     }
-  }
+  }, 520);
 }
 function buildHomePanel(){
   if(THEME.kind!=="metro" || !player || !player.homeLine){ if(homePanel) homePanel.style.display="none"; return; }
   homePanel.style.display="block"; homePanel.innerHTML="";
+  // 头部：家园建设进度（X/N）
   var h4=document.createElement("h4");
-  h4.textContent="🏠 建设家园 · "+player.homeLine.name+"（"+player.homeLine.stations.length+" 站）";
+  h4.innerHTML="🏠 家园 · "+player.homeLine.name+" <b id='hpCount'>"+homeEl.textContent+"</b>";
   homePanel.appendChild(h4);
-  var wrap=document.createElement("div"); wrap.className="hp";
-  homeChips=[];
-  for(var i=0;i<player.homeLine.stations.length;i++){
-    var c=document.createElement("div"); c.className="st"; c.textContent=player.homeLine.stations[i];
-    wrap.appendChild(c); homeChips.push(c);
+  hpCountEl=h4.querySelector("#hpCount")||null;
+  // 10 条线路图例：逐条「点亮」
+  var leg=document.createElement("div"); leg.className="lp";
+  homeLineRows=[];
+  for(var i=0;i<THEME.lines.length;i++){
+    var lin=THEME.lines[i];
+    var row=document.createElement("div"); row.className="lp-row"+(lin===player.homeLine?" home":"");
+    var bar=document.createElement("span"); bar.className="lp-bar"; bar.style.background=lin.color;
+    var nm=document.createElement("span"); nm.className="lp-name";
+    nm.textContent=lin.name + (lin===player.homeLine ? "  ⌂" : "");
+    row.appendChild(bar); row.appendChild(nm);
+    leg.appendChild(row); homeLineRows.push(row);
   }
-  homePanel.appendChild(wrap);
+  homePanel.appendChild(leg);
+  updateHome();
+  startLineHi();
 }
 
 /* ===== 主循环 ===== */

@@ -73,6 +73,7 @@ function makeSandbox(theme) {
     performance: { now: () => sandbox.__clock },
     requestAnimationFrame: (cb) => { sandbox.__raf = cb; },
     setTimeout: () => 0,
+    setInterval: () => 0, clearInterval: () => {},
     URLSearchParams,
     console,
     __els: els, __winL: winL, __clock: 1000, __raf: null
