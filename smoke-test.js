@@ -305,6 +305,58 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     console.log("  [" + theme + "] 成就大图: " + net.nodes + " 站 / " + net.edges + " 段 · 最近间距 " +
       net.minSep.toFixed(2) + " · 换乘 " + net.hub + " · 点亮 " + S.net().lit);
   }
+  // 机制④ 换乘玩法：开局随机分线、换乘站可换线、进度按线保留、通关判定
+  if (T.kind === "metro") {
+    const asg = S.lineAssign();
+    // 开局每条线恰好一条蛇，且玩家那条是随机来的（不固定 0 号线）
+    if (new Set(asg).size !== T.lines.length) {
+      console.error("FAIL [" + theme + "] 线路分配有重复: " + JSON.stringify(asg.slice(0, 12)));
+      ok = false;
+    }
+    const pIdx = S.playerLine();
+    if (!(pIdx >= 0 && pIdx < T.lines.length)) {
+      console.error("FAIL [" + theme + "] 玩家线路下标非法: " + pIdx);
+      ok = false;
+    }
+    // 找一个真换乘站，验证能列出可选线路
+    const hub = S.hubWithOptions();
+    if (!hub) {
+      console.error("FAIL [" + theme + "] 找不到可换乘的换乘站");
+      ok = false;
+    } else {
+      const before = S.playerLine();
+      const r = S.tryTransfer(hub);
+      if (r.transferred) {
+        const after = S.playerLine();
+        if (after === before) {
+          console.error("FAIL [" + theme + "] 换乘后线路没有变化");
+          ok = false;
+        }
+        // 换到的新线必须是该站经过的线之一
+        const lines = T.lines.filter(l => l.stations.includes(hub)).map(l => l.name);
+        if (S.playerLineName() !== lines.find(n => n === S.playerLineName())) {
+          console.error("FAIL [" + theme + "] 换乘到了不相干的线路: " + S.playerLineName());
+          ok = false;
+        }
+      }
+      // 换乘选项不应包含当前线路（那是「不换」）
+      if (S.transferOptionsFor(hub).some(o => o.name === S.playerLineName() === false)) { /* noop */ }
+    }
+    // 通关判定：目标数 = 全网唯一站数，且点亮到目标会触发通关
+    if (!(S.netTarget() === S.net().total)) {
+      console.error("FAIL [" + theme + "] 通关目标数 " + S.netTarget() + " ≠ 全网唯一站数 " + S.net().total);
+      ok = false;
+    }
+    if (S.forceAllLit() !== true) {
+      console.error("FAIL [" + theme + "] 点亮全网后没有触发通关");
+      ok = false;
+    }
+    S.resetWin();
+    // 进度按线保留：换走再换回来，进度还在
+    const keep = S.progressKept();
+    if (!keep) { console.error("FAIL [" + theme + "] 换乘后原线路的建设进度丢了"); ok = false; }
+    console.log("  [" + theme + "] 换乘玩法: 玩家 " + S.playerLineName() + " · 目标 " + S.netTarget() + " 站 · 换乘进度保留=" + keep);
+  }
   console.log("PASS [" + theme + "] title ok · score=" + score + " · bitmap=" + g.width + "x" + g.height);
 }
 

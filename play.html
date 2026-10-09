@@ -170,6 +170,28 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
   .gal-empty{font-size:12px;color:var(--ink-soft);line-height:1.9;}
   #galBtn{font-size:11.5px;letter-spacing:1px;}
   #achBtn{font-size:11.5px;letter-spacing:1px;}
+  /* 玩法：换乘站选择面板 —— 吃到换乘站时弹出，可跳到该站经过的另一条线。
+     z-index 要高于 .overlay（开场/暂停/结算面板），否则会被盖住。 */
+  #trPanel{position:fixed;left:50%;bottom:16%;transform:translateX(-50%) scale(.94);
+    z-index:90;display:none;flex-direction:column;gap:7px;align-items:center;
+    padding:11px 15px;border-radius:12px;background:#fff;
+    border:1px solid var(--line);box-shadow:0 10px 30px rgba(60,50,30,.35);max-width:92vw;}
+  #trPanel.on{display:flex;animation:cardIn .2s ease-out;}
+  #trPanel .tr-t{font-size:13px;letter-spacing:1px;color:var(--ink);}
+  #trPanel .tr-t b{color:var(--accent);}
+  #trPanel .tr-opts{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;}
+  #trPanel .tr-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;
+    border-radius:14px;border:2px solid #ccc;background:#fff;color:var(--ink);
+    font-size:14px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+  #trPanel .tr-chip:hover{border-color:var(--teal);}
+  #trPanel .tr-chip .sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:0 0 auto;
+    box-shadow:0 0 0 1px rgba(0,0,0,.14) inset;}
+  #trPanel .tr-skip{font-size:11px;color:var(--ink-soft);background:none;border:none;
+    cursor:pointer;font-family:inherit;letter-spacing:1px;text-decoration:underline;}
+  /* 全网目标进度 */
+  #netWrap{display:inline;}
+  #netWrap.near #netCount{color:var(--accent);}
+  #netCount b{font-size:13px;}
   /* 机制③：成就大图（全城线路图，点亮 = 打过卡的站） */
   .overlay#achieve{justify-content:flex-start;gap:6px;padding:10px 12px;background:rgba(243,238,227,.97);overflow:auto;z-index:60;}
   .ach-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;width:100%;}
@@ -203,6 +225,7 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     <div>长度 <b id="score">0</b></div>
     <div id="nextWrap" style="display:none">下一站 <b id="nextSt">—</b></div>
     <div id="cardWrap" style="display:none">站卡 <b id="cardCount">0</b></div>
+    <div id="netWrap" style="display:none">全网 <b id="netCount">0 / 0</b></div>
     <div>最长 <b id="best">0</b></div>
     <div>排名 <b id="rank">-</b></div>
     <div id="homeWrap">家园 <b id="home">0/0</b></div>
@@ -254,6 +277,11 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
       <button id="achGo" style="background:linear-gradient(180deg,#2f9b95,#1f6f6b);box-shadow:0 4px 0 #14524f;">看成就大图</button>
       <button id="galClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
     </div>
+    <div class="overlay hidden" id="winOverlay">
+      <h2>🎉 全网读完，通关！</h2>
+      <p id="winStats"></p>
+      <button id="winBtn">再来一局</button>
+    </div>
     <div class="overlay hidden" id="achieve">
       <div class="ach-head">
         <h2 id="achTitle">🏆 成就大图</h2>
@@ -276,6 +304,11 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     </div>
   </div>
   <div id="cardLayer"></div>
+  <div id="trPanel">
+    <div class="tr-t">在 <b id="trStation">—</b> 换乘到哪条线？</div>
+    <div class="tr-opts" id="trOpts"></div>
+    <button class="tr-skip" id="trSkip">不换，继续走本线</button>
+  </div>
 
   <div id="homePanel" class="home-panel"></div>
 
@@ -293,7 +326,9 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     电脑：方向键 / WASD；<b>连按两次方向键 = 加速冲刺</b>；空格暂停<br>
     点「全屏」→ <b>自动转横屏</b>并铺满 · 点「托管」让 AI 代打（<b>无敌</b>，撞到不掉肉也不死）<br>
     <b>蛇头亮红圈 = 那一带挤成堆了，往空处走</b>；被围住会短暂免罚，可以挤出去<br>
-    地铁版：<b>同一个站累计吃到第 3 次会弹出站卡</b>（附近景点 / 美食 / 换乘），图鉴见「🗂 站卡」<br>
+    地铁版：<b>开局随机分配一条线路</b>；吃到<b>换乘站可以跳到别的线</b>（名字颜色会变，各线进度分别保留）；<br>
+    目标是<b>把全网车站卡片都点亮</b> —— HUD「全网 X / 410」就是进度；<br>
+    同一个站累计吃到第 3 次弹出站卡（景点 / 历史 / 美食 / 换乘），图鉴见「🗂 站卡图鉴」<br>
     托管时动一下方向键即接管回来</div>
   <div class="foot" id="pageFoot">贪吃蛇</div>
 
@@ -462,15 +497,36 @@ function pickTheme(){
   return THEMES.su;
 }
 const THEME = pickTheme();
-var playerLineIdx=0;   // 地铁版：玩家当前所玩线路（切换线路用）
 
-/* —— 地铁版：真实站名池 + 每条蛇的「家园」线路 —— */
-/* 地铁版：每一条线路都有一条蛇出战。
-   玩家占 playerLineIdx 那条线，其余线路各配一条 AI 蛇（跳过玩家所占的线，避免撞线） */
-function botLineIdx(i){
-  var n=THEME.lines.length; if(n<2) return 0;
-  var k=i%(n-1);
-  return k<playerLineIdx ? k : k+1;
+/* —— 地铁版：线路分配 ——
+   玩法：每条蛇开局随机领到一条线路；吃到换乘站时可以「换乘」到另一条线，
+   身份（名字/颜色）随之改变。全网所有车站的卡片都点亮 = 获胜。
+   所以线路不再是「出生就定死」，而是随时可换的资源。 */
+var lineAssign=[];        // lineAssign[蛇的 id] = 线路下标
+var playerLineIdx=0;      // 「切线面板」里玩家手动指定的线路（0=不指定，开局随机）
+                          // 玩家当前实际所在线请读 player.lineIdx，不要用这个
+function shuffledAssign(n){
+  var a=[], i, j, t;
+  for(i=0;i<n;i++) a.push(i);
+  for(i=n-1;i>0;i--){ j=rnd(i+1); t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+/* 给某条蛇换线路：身份跟着线路走，并保留/接续该线已有的建设进度 */
+function applyLine(sn, li, fromStation){
+  var L=THEME.lines[li];
+  if(!L) return;
+  sn.lineIdx=li;
+  sn.homeLine=L;
+  sn.name=L.name; sn.color=L.color;
+  sn.lineProg=sn.lineProg||{};
+  var pg=sn.lineProg[li];
+  if(!pg){ pg=sn.lineProg[li]={next:0,built:{}}; }
+  // 换乘进来的站：把它记成已建，并从下一站接着往下走
+  if(fromStation){
+    var i=L.stations.indexOf(fromStation);
+    if(i>=0){ pg.built[fromStation]=1; if(i+1>pg.next) pg.next=i+1; }
+  }
+  sn.homeGlow=12;
 }
 /* ════════════════════════════════════════════════════════════════════════
    模式模块（MODE）：文字线 text  /  地铁线 metro
@@ -536,12 +592,12 @@ const MODES = {
       // 而 MODE.init() 执行得比它早（var 提升只提升声明、不提升赋值）。
       // 统一放在文件末尾的启动段调用。
     },
-    botCount:function(){ return THEME.lines.length-1; },   // 每条线路都有一条蛇出战
-    playerDef:function(){ var L=THEME.lines[playerLineIdx]; return {name:L.name,color:L.color}; },
-    botDef:function(i){ var L=THEME.lines[botLineIdx(i)]; return {name:L.name,color:L.color}; },
+    botCount:function(){ return THEME.lines.length-1; },   // 玩家占一条，其余每线一条（合计=线路数）
+    playerDef:function(){ var L=THEME.lines[lineAssign[0]||0]; return {name:L.name,color:L.color}; },
+    botDef:function(i){ var L=THEME.lines[lineAssign[i+1]||0]; return {name:L.name,color:L.color}; },
     homeLineFor:function(id,isPlayer){
-      if(isPlayer) return THEME.lines[playerLineIdx];   // 玩家所选线路（可切换）
-      return THEME.lines[botLineIdx(id-1)];             // 其余每条线各一条蛇
+      var li=(lineAssign[id]!==undefined)?lineAssign[id]:(id%THEME.lines.length);
+      return THEME.lines[li];
     },
     mkFood:function(x,y,value,forceName){
       var s;
@@ -554,12 +610,31 @@ const MODES = {
               transfer:(tr&&tr.length>1)?tr.slice():null, value:value||1};
     },
     onTick:function(){ ensureNextStation(); },
-    onEat:function(sn,f){ if(sn.isPlayer){ tryBuildHome(sn,f); onStationEaten(sn,f); } },
+    /* 地铁版：吃到站 → 建设家园 + 换乘判定 + 打卡卡片 */
+    onEat:function(sn,f){
+      tryBuildHome(sn,f);
+      // 换乘站：可以跳到另一条线
+      if(f.name && TRANSFER[f.name] && TRANSFER[f.name].length>1){
+        if(sn.isPlayer){
+          if(!f._trOpts) f._trOpts=transferOptions(sn,f.name);
+          if(f._trOpts.length) pendingTransfer={sn:sn, name:f.name, opts:f._trOpts};
+        } else {
+          var want=botWantTransfer(sn,f.name);
+          if(want>=0 && Math.random()<0.55) doTransfer(sn,want,f.name);
+        }
+      }
+      if(sn.isPlayer) onStationEaten(sn,f);
+      // 换乘面板：只在玩家「首次」吃到某个换乘站时弹，避免连着吃到同类站时反复弹窗
+      if(pendingTransfer && !pendingTransfer.shown){
+        pendingTransfer.shown=1;
+        if(!transferHintT) showTransferPanel();
+      }
+    },
     drawFood:function(f,FX,FY,pulse){ drawMetroFood(f,FX,FY,pulse); },
     drawBody:function(pts,sn){ drawMetroBody(pts,sn); },
     drawHeadLabel:function(H,sn){ drawMetroHeadLabel(H,sn); },
     drawOverlay:function(S,SH){ drawTransferHint(S,SH); },
-    updateHud:function(){ updateHome(); updateCardCount(); },
+    updateHud:function(){ updateHome(); updateCardCount(); updateNetHud(); },
     buildPanel:function(){ buildHomePanel(); }
   }
 };
@@ -961,6 +1036,12 @@ var achInfoEl=document.getElementById("achInfo");
   if(cc) cc.onclick=openGallery;
   var gb=document.getElementById("galBtn");
   if(gb) gb.onclick=openGallery;
+  var trSkip=document.getElementById("trSkip");
+  if(trSkip) trSkip.onclick=hideTransferPanel;
+  var winB=document.getElementById("winBtn");
+  if(winB) winB.addEventListener("click",function(){
+    document.getElementById("winOverlay").classList.add("hidden"); startGame();
+  });
   var ag=document.getElementById("achGo");
   if(ag) ag.onclick=function(){ galleryEl.classList.add("hidden"); openAchieve(); };
   var ach=document.getElementById("achBtn");
@@ -1199,7 +1280,7 @@ function occSet(){
 function ensureNextStation(){
   if(!player||!player.alive||!player.homeLine) return;
   if(!player.body||!player.body[0]) return;
-  var st=player.homeLine.stations, idx=player.nextHomeIdx||0;
+  var st=player.homeLine.stations, idx=nextIdxOf(player);
   if(idx>=st.length) return;
   var want=st[idx], i;
   for(i=0;i<food.length;i++) if(food[i].name===want) return;   // 已存在，不用补
@@ -1226,23 +1307,35 @@ function spawnSnake(o){
   return {id:o.id,name:o.name,color:o.color,isPlayer:!!o.isPlayer,alive:true,
     body:body, prev:body.map(function(c){return {x:c.x,y:c.y};}), dir:d, nextDir:d,
     score:len, boosting:false, respawnAt:0, hitCd:0, bc:0,
-    homeLine:null, nextHomeIdx:0, homeGlow:0, squeezeUntil:0};
+    homeLine:null, lineIdx:0, lineProg:null, homeGlow:0, squeezeUntil:0};
 }
 function reset(){
   food=[]; snakes=[]; tickCount=0;
   dens.fill(0); zoneFood.fill(0);
+  // 线路随机分配：打乱线路顺序发给各条蛇（玩家也随机），每条线恰好一条蛇
+  // 文字版没有 lines，跳过分配（沿用固定名字）
+  var nLines=(MODE.lineBased&&THEME.lines)?THEME.lines.length:0;
+  lineAssign=nLines?shuffledAssign(nLines):[];
+  if(nLines && playerLineIdx>0 && THEME.lines[playerLineIdx]){
+    // 手动指定：把玩家换到指定线，同时把原来占用这条线的蛇挪走，保证「每线一条蛇」不破
+    var at=lineAssign.indexOf(playerLineIdx);
+    if(at>0) lineAssign[at]=lineAssign[0];
+    lineAssign[0]=playerLineIdx;
+  }
   var pd=MODE.playerDef();
   player=spawnSnake({id:0,name:pd.name,color:pd.color,isPlayer:true});
-  player.homeLine=MODE.homeLineFor(0,true);
+  if(nLines) applyLine(player, lineAssign[0]||0);      // 身份 = 领到的线路
+  else player.homeLine=MODE.homeLineFor(0,true);
   snakes.push(player);
-  // 对手数量由模式模块决定：地铁版=每条线一条蛇（全线网出战）；文字版=固定 BOT_COUNT
   var nBots=MODE.botCount();
   for(var i=0;i<nBots;i++){ var d=MODE.botDef(i);
     var bs=spawnSnake({id:i+1,name:d.name,color:d.color,len:BOT_START_LEN});
-    bs.homeLine=MODE.homeLineFor(i+1,false);
+    if(nLines) applyLine(bs, (lineAssign[i+1]!==undefined)?lineAssign[i+1]:(i+1)%nLines);
+    else bs.homeLine=MODE.homeLineFor(i+1,false);
     snakes.push(bs); }
   camX=player.body[0].x; camY=player.body[0].y; camInit=true;
   scoreEl.textContent=player.score; updateBoard(); spawnFood(FOOD_TARGET);
+  buildNets();                     // 本局目标：把全网车站都点亮
 }
 
 /* ===== AI ===== */
@@ -1320,14 +1413,32 @@ function autoThink(sn){
   sn.nextDir=steer(sn,bestF,occSet(),headList(),false);
 }
 
-/* 地铁版：按真实相邻顺序吃下本线下一站 → 建成家园一节（额外奖励），并高亮 */
+/* 某条蛇在它当前线路上的「下一站」序号（进度按线分别记，换乘回来还在） */
+function nextIdxOf(sn){
+  if(!sn||!sn.homeLine) return 0;
+  var pg=sn.lineProg&&sn.lineProg[sn.lineIdx];
+  return pg?(pg.next||0):0;
+}
+function progOf(sn){
+  sn.lineProg=sn.lineProg||{};
+  var pg=sn.lineProg[sn.lineIdx];
+  if(!pg){ pg=sn.lineProg[sn.lineIdx]={next:0,built:{}}; }
+  return pg;
+}
+/* 地铁版：按真实相邻顺序吃下本线下一站 → 建成家园一节（额外奖励），并高亮。
+   进度按线分别记录（sn.lineProg[线号]），换乘回来时进度还在。 */
 function tryBuildHome(sn,f){
   if(!sn.homeLine) return;
-  var st=sn.homeLine.stations, idx=sn.nextHomeIdx||0;
+  var li=sn.lineIdx, st=sn.homeLine.stations;
+  var pg=progOf(sn);
+  var idx=pg.next||0;
   if(idx<st.length && f.name===st[idx]){
-    sn.nextHomeIdx=idx+1; sn.homeGlow=12;
+    pg.next=idx+1; pg.built[f.name]=1; sn.homeGlow=12;
     var t=sn.body[sn.body.length-1];
     sn.body.push({x:t.x,y:t.y,name:f.name,line:f.line});   // 奖励一节，永久加长
+  } else if(st.indexOf(f.name)>=0){
+    // 吃到本线非顺序的站也算读过（点亮进度用）
+    pg.built[f.name]=1;
   }
 }
 
@@ -1567,6 +1678,29 @@ function openGallery(){
    （固定种子 → 每次结果完全一致）。换乘站会自然成为枢纽：它被多条线的弹簧同时拉住。 */
 var NET=null, NET_KEY="", NETVIEW=null, ACH_VIEW="mine";   // mine=只上色本线 / all=全网着色
 var ACHIEVE_KEY="snake_achieve_";     // localStorage：按主题分别存进度
+var pendingTransfer=null;              // 待确认的换乘 {sn,name,opts}
+function showTransferPanel(){
+  var p=document.getElementById("trPanel"), box=document.getElementById("trOpts");
+  if(!p||!box||!pendingTransfer) return;
+  document.getElementById("trStation").textContent=pendingTransfer.name;
+  box.innerHTML="";
+  var opts=pendingTransfer.opts;
+  for(var i=0;i<opts.length;i++){
+    (function(o){
+      var b=document.createElement("button");
+      b.className="tr-chip";
+      b.innerHTML='<span class="sw" style="background:'+o.color+'"></span>'+o.name;
+      b.addEventListener("click",function(){ doTransfer(pendingTransfer.sn,o.lineIdx,pendingTransfer.name); hideTransferPanel(); });
+      box.appendChild(b);
+    })(opts[i]);
+  }
+  p.classList.add("on");
+}
+function hideTransferPanel(){
+  pendingTransfer=null;
+  var p=document.getElementById("trPanel");
+  if(p) p.classList.remove("on");
+}
 function makeRng(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 /* ① 建图：节点 = 唯一站名，边 = 同线相邻站 */
 function buildGraph(){
@@ -1882,6 +2016,108 @@ function achInfo(nd){
   achInfoEl.textContent = nd.name+"　"+nd.ls.join(" / ")+(nd.hub?"（换乘站）":"")+"　—　"+stateTxt;
 }
 
+/* ══════════════ 玩法：线路可换乘 + 全网点亮获胜 ══════════════
+   规则三条：
+     ① 开局每条蛇随机领一条线（玩家也随机）；
+     ② 吃到换乘站（该站有 ≥2 条线经过）时，可以换乘到另一条线 →
+        蛇的名字/颜色跟着换，建设进度按线各自保留；
+     ③ 全网所有车站都点亮了卡片 = 通关。
+   之前是「每条蛇守死一条线」，只能手动选线；现在线路变成可流转的资源，
+   于是「往哪条线跳」成了真正的策略：热门换乘站会变成争夺焦点。 */
+
+/* 本局目标：把全网车站都点一遍（换句话说，每条线都被吃到过 CARD_AT 次） */
+var NET_TARGET=null, winShown=false;
+function buildNets(){
+  if(!STATION_POOL.length){ NET_TARGET=null; return; }   // 文字版没有全网目标
+  var seen={}, i;
+  for(i=0;i<STATION_POOL.length;i++) seen[STATION_POOL[i].name]=1;
+  NET_TARGET=Object.keys(seen).length;      // 北京 410 / 南京 266
+  winShown=false;
+  updateNetHud();
+}
+function netLitCount(){
+  var seen={}, i, n=0;
+  for(i=0;i<STATION_POOL.length;i++){
+    var nm=STATION_POOL[i].name;
+    if(cardsGot[nm] && !seen[nm]){ seen[nm]=1; n++; }
+  }
+  return n;
+}
+function updateNetHud(){
+  var el=document.getElementById("netWrap"), c=document.getElementById("netCount");
+  if(!el||!c) return;
+  if(NET_TARGET===null){ el.style.display="none"; return; }   // 文字版没有全网目标
+  el.style.display="";
+  var n=netLitCount();
+  c.textContent=n+" / "+NET_TARGET;
+  var pct=(n/NET_TARGET*100);
+  el.title="全网点亮 "+pct.toFixed(1)+"%";
+  el.classList.toggle("near", pct>=80);
+  // 通关判定
+  if(!winShown && n>=NET_TARGET) showWin();
+}
+/* 通关：全网车站卡片都读过了 */
+function showWin(){
+  winShown=true;
+  var w=document.getElementById("winOverlay");
+  if(w){
+    document.getElementById("winStats").innerHTML=
+      "全网 <b>"+NET_TARGET+"</b> 个车站全部读完<br>"+
+      "你的最终长度 <span class='big'>"+(player?player.score:0)+"</span>";
+    w.classList.remove("hidden");
+    if(running){ running=false; }
+  }
+}
+
+/* 换乘：吃到换乘站时，列出可换的线路 */
+function transferOptions(sn, stationName){
+  var tr=TRANSFER[stationName]||[], out=[], i;
+  for(i=0;i<tr.length;i++){
+    var li=lineIndexOf(tr[i]);
+    if(li<0) continue;
+    if(li===sn.lineIdx) continue;                    // 不算「换」到自己
+    // 该站必须真的在这条线上（TRANSFER 是全网同名站聚合，可能不含本蛇这条线）
+    if(THEME.lines[li].stations.indexOf(stationName)<0) continue;
+    out.push({lineIdx:li, name:tr[i], color:THEME.lines[li].color});
+  }
+  return out;
+}
+function lineIndexOf(name){
+  for(var i=0;i<THEME.lines.length;i++) if(THEME.lines[i].name===name) return i;
+  return -1;
+}
+/* 真正执行换乘 */
+function doTransfer(sn, li, stationName){
+  if(!sn||!sn.homeLine) return;
+  var old=sn.homeLine.name;
+  applyLine(sn, li, stationName);                     // 换身份 + 接续该线进度
+  if(sn.isPlayer){
+    transferHint=stationName+" 换乘 → "+sn.homeLine.name;
+    transferHintT=90;
+    saveProgress();
+    updateBoard(); updateHome(); updateCardCount();
+  } else {
+    if(sn.popText) sn.popText="换乘"+sn.homeLine.name;
+  }
+}
+var transferHint="", transferHintT=0;
+
+/* AI 换乘决策：换到「自己还没点亮多少」的线（越少越值得去），同分随机 */
+function botWantTransfer(sn, stationName){
+  var opts=transferOptions(sn, stationName);
+  if(!opts.length) return -1;
+  var best=-1, bestScore=1e9, i;
+  for(i=0;i<opts.length;i++){
+    var L=THEME.lines[opts[i].lineIdx];
+    // 这一线里自己还没读过的站越多 → 越想换过去（把弱线先吃掉）
+    var pg=(sn.lineProg&&sn.lineProg[opts[i].lineIdx])||null;
+    var unread=L.stations.length - (pg?Object.keys(pg.built).length:0);
+    var s=unread + Math.random()*2;
+    if(s<bestScore){ bestScore=s; best=opts[i].lineIdx; }
+  }
+  return best;
+}
+
 /* ===== 大作战机制 ===== */
 function dropMeat(sn,n){
   recountZones();
@@ -1975,9 +2211,19 @@ function tick(now){
     var sn=snakes[i];
     if(!sn.alive){
       if(sn.respawnAt && now>=sn.respawnAt && !sn.isPlayer){
-        var bd=botDef(sn.id-1);
-        snakes[i]=spawnSnake({id:sn.id,name:bd.name,color:bd.color,len:BOT_START_LEN});
-        snakes[i].homeLine=MODE.homeLineFor(sn.id,false);
+        // 重生：地铁版随机领一条线（线路已是可流转资源，不必回原线）；
+        // 保留这条蛇此前各条线的建设进度，重生后接着建
+        var keepProg=sn.lineProg||null, keepIdx=sn.lineIdx;
+        var d2=MODE.botDef(sn.id-1);
+        snakes[i]=spawnSnake({id:sn.id,name:d2.name,color:d2.color,len:BOT_START_LEN});
+        if(MODE.lineBased&&THEME.lines){
+          var li=rnd(THEME.lines.length);
+          applyLine(snakes[i], li);
+          snakes[i].lineProg=keepProg||{};     // 进度跟着蛇走，不因死亡清零
+          snakes[i].lineIdx=li;
+          snakes[i].homeLine=THEME.lines[li];
+          snakes[i].name=THEME.lines[li].name; snakes[i].color=THEME.lines[li].color;
+        } else snakes[i].homeLine=MODE.homeLineFor(sn.id,false);
       }
       continue;
     }
@@ -2096,7 +2342,7 @@ function strokeSeg(arr,color,isPlayer){
 /* 地铁线模块：食物 = 真实车站票根（换乘站金色枢纽 + 下一站金色脉冲环） */
 function drawMetroFood(f,FX,FY,pulse){
   var isHub=!!f.transfer;
-  var isNext=(player&&player.homeLine&&f.name&&f.name===player.homeLine.stations[player.nextHomeIdx||0]);
+  var isNext=(player&&player.homeLine&&f.name&&f.name===player.homeLine.stations[nextIdxOf(player)]);
   var ss=CELL*0.34;
   if(isHub){                                   // 换乘枢纽：金色底座
     ctx.fillStyle="#f7d774";
@@ -2302,6 +2548,15 @@ function draw(a){
     ctx.fillText("加速中", S-8, 8);
   }
   if(hitFlash>0){ ctx.fillStyle="rgba(200,50,30,"+(0.30*hitFlash)+")"; ctx.fillRect(0,0,S,SH); }
+  // 换乘提示：屏幕中部闪一下「XX 换乘 → YY号线」
+  if(transferHintT>0){
+    transferHintT-=dt/6;
+    ctx.textAlign="center"; ctx.textBaseline="top";
+    ctx.font="bold "+(CELL*0.62)+"px 'STKaiti','KaiTi','楷体',serif";
+    ctx.fillStyle="rgba(217,164,65,"+Math.min(1,transferHintT/30).toFixed(2)+")";
+    ctx.fillText(transferHint, S/2, S*0.34);
+    if(transferHintT<=0) transferHint="";
+  }
   MODE.drawOverlay(S,SH);   // 模式模块的屏幕层提示（地铁版=换乘枢纽提示）
   drawMini();
 }
@@ -2364,7 +2619,7 @@ function updateHome(){
   homeEl.textContent=h.built+"/"+h.total;
   if(hpCountEl) hpCountEl.textContent=h.built+"/"+h.total;
   // HUD「下一站」：即使目标不在视野内，也知道该去找哪个站
-  var st=player.homeLine.stations, idx=player.nextHomeIdx||0;
+  var st=player.homeLine.stations, idx=nextIdxOf(player);
   var nwEl=document.getElementById("nextWrap"), nsEl=document.getElementById("nextSt");
   if(nwEl&&nsEl){
     nsEl.textContent = (idx<st.length) ? st[idx] : "全线建满";
@@ -2592,14 +2847,18 @@ document.getElementById("autoBtn").addEventListener("click",function(){ setAuto(
 /* 切换线路 / 切换城市（地铁版） */
 function openLinePicker(){
   var grid=document.getElementById("lineGrid"); grid.innerHTML="";
-  document.getElementById("pickerTitle").textContent="选择线路（"+THEME.label+"）";
+  document.getElementById("pickerTitle").textContent="线路开局随机分配 · 你现在这条线是 "+player.homeLine.name;
+  // 现在线路是随机分配的，所以这个面板改成「看线路 / 手动重开一次换条线」
   for(var i=0;i<THEME.lines.length;i++){
     (function(idx){
       var L=THEME.lines[idx];
       var b=document.createElement("button");
-      b.className="line-chip"+(idx===playerLineIdx?" cur":"");
+      b.className="line-chip"+(idx===player.lineIdx?" cur":"");
       b.innerHTML='<span class="sw" style="background:'+L.color+'"></span>'+L.name;
-      b.addEventListener("click",function(){ playerLineIdx=idx; document.getElementById("linePicker").classList.add("hidden"); startGame(); });
+      b.addEventListener("click",function(){
+        document.getElementById("linePicker").classList.add("hidden");
+        playerLineIdx=idx; startGame();     // 手动指定一条线重开（下次重开仍锁定这条，除非再点随机）
+      });
       grid.appendChild(b);
     })(i);
   }
@@ -2734,6 +2993,52 @@ window.__SNAKE__={
   keepCard:function(){ return {paused:paused, cardPaused:cardPaused}; },
   closeCard:function(){ closeCard(); return {paused:paused, cardPaused:cardPaused}; },
   isPaused:function(){ return paused; },
+  /* —— 机制④ 换乘玩法自检 —— */
+  lineAssign:function(){ return lineAssign.slice(); },
+  playerLine:function(){ return player?player.lineIdx:-1; },
+  playerLineName:function(){ return (player&&player.homeLine)?player.homeLine.name:""; },
+  netTarget:function(){ return NET_TARGET; },
+  /* 找一个「玩家换乘后仍能换」的站：取一个 ≥3 线的大枢纽 */
+  hubWithOptions:function(){
+    var best=null, i, j;
+    for(i=0;i<THEME.lines.length && !best;i++)
+      for(j=0;j<THEME.lines[i].stations.length;j++){
+        var nm=THEME.lines[i].stations[j];
+        if((TRANSFER[nm]||[]).length>=3){ best=nm; break; }
+      }
+    return best;
+  },
+  transferOptionsFor:function(nm){
+    if(!player) return [];
+    return transferOptions(player,nm).map(function(o){return {name:o.name,lineIdx:o.lineIdx};});
+  },
+  tryTransfer:function(nm){
+    var before=player.lineIdx, opts=transferOptions(player,nm);
+    if(!opts.length) return {transferred:false, reason:"no-options"};
+    doTransfer(player, opts[0].lineIdx, nm);
+    return {transferred:player.lineIdx!==before, from:before, to:player.lineIdx};
+  },
+  /* 换乘后原线进度是否保留 */
+  progressKept:function(){
+    if(!player) return false;
+    var keys=player.lineProg?Object.keys(player.lineProg).length:0;
+    return keys>=2;      // 至少记录过两条线的进度
+  },
+  /* 把全网都点亮，验证通关判定 */
+  forceAllLit:function(){
+    var i;
+    for(i=0;i<STATION_POOL.length;i++) cardsGot[STATION_POOL[i].name]=1;
+    updateNetHud();
+    return winShown;
+  },
+  resetWin:function(){ winShown=false; var w=document.getElementById("winOverlay"); if(w) w.classList.add("hidden"); },
+  isWin:function(){ return winShown; },
+  showTransfer:function(nm){
+    if(!player) return 0;
+    pendingTransfer={sn:player, name:nm, opts:transferOptions(player,nm)};
+    showTransferPanel();
+    return pendingTransfer.opts.length;
+  },
   historyOf:function(n){ return historyOf(n); },
   foodCount:function(){ return food.length; },
   snakes:function(){ return snakes.length; },
