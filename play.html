@@ -136,7 +136,7 @@
   body.mob #fsFloatBtn,body.mob #autoBtn,body.mob #achFloatBtn{font-size:11px;padding:5px 10px;min-height:32px;}
   /* ===== 事件播报（kill feed）：右上角滑入，4 秒自动淡出 =====
      竞技感的最低成本来源：让「我撞了谁」「我超过了谁」被看见。 */
-  #feed{position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:3px;
+  #feed{position:absolute;left:8px;top:80px;display:flex;flex-direction:column;gap:3px;
     pointer-events:none;z-index:6;max-width:72%;align-items:flex-start;}
   .feed-it{font-size:11px;padding:3px 10px;border-radius:11px;background:rgba(255,255,255,.93);
     border:1px solid var(--line);color:var(--ink);letter-spacing:.5px;animation:feedOut 4s forwards;}
@@ -146,6 +146,54 @@
   /* 玩法说明：折叠后可开（收掉是为了腾空间，但不能让人找不到） */
   body.mob .hint{display:none;margin-top:4px;font-size:11px;line-height:1.6;max-width:none;}
   body.mob.hint-on .hint{display:block;}
+
+  /* ══════════ 手游 / 端游式 HUD：画布角上的小圆钮 + 抽屉面板 ══════════
+     借鉴的地方：
+       · 手游主界面 = 画面 + 一行状态 + 角落图标栏，功能全在抽屉/弹层里（背包、排行、设置）
+       · 端游小地图/技能栏 = 常驻小控件，点开放大成面板
+     落到本项目：把工具栏 / 排行榜 / 长说明 / 页脚统统收进抽屉，
+     页面流里只剩「HUD 一行 + 画布 + 操作区」→ 画布能大一圈，手机上也不再需要滚动条。
+     想要回退：抽屉底部有「经典布局」开关（存 localStorage）。 */
+  .fab{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px;z-index:20;}
+  .fab button{width:38px;height:38px;padding:0;border-radius:50%;font-size:15px;line-height:1;
+    background:rgba(255,255,255,.93);color:var(--ink);border:1px solid var(--line);
+    box-shadow:0 3px 8px rgba(0,0,0,.20);cursor:pointer;font-family:inherit;}
+  .fab button:active{transform:translateY(2px);}
+  .fab button.on{background:var(--teal);color:#fff;border-color:var(--teal);}
+  body.mob .fab button{width:34px;height:34px;font-size:13px;}
+  /* 紧凑：收掉页面流里的 chrome */
+  body.cpt .toolbar,body.cpt .subtitle,body.cpt .hint,body.cpt .foot,
+  body.cpt .board,body.cpt #fsFloatBtn,body.cpt #autoBtn,body.cpt #achFloatBtn{display:none;}
+  body.cpt .stage{width:min(98vw,1180px);}
+  body.cpt h1{font-size:15px;letter-spacing:3px;margin:0 0 2px;}
+  /* 抽屉：桌面右侧滑入，手机底部 sheet */
+  #drawerMask{position:fixed;inset:0;background:rgba(40,34,24,.30);z-index:110;display:none;}
+  #drawerMask.on{display:block;}
+  #drawer{position:fixed;top:0;right:0;bottom:0;width:min(370px,92vw);z-index:120;
+    background:#fbf7ee;border-left:1px solid var(--line);box-shadow:-8px 0 26px rgba(60,50,30,.22);
+    transform:translateX(103%);transition:transform .18s ease-out;display:flex;flex-direction:column;}
+  #drawer.on{transform:none;}
+  #drawer .dr-head{display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid var(--line);}
+  #drawer .dr-head b{font-size:14px;letter-spacing:1px;flex:1;}
+  #drawer .dr-x{border:none;background:none;font-size:22px;line-height:1;color:var(--ink-soft);cursor:pointer;padding:0 4px;}
+  #drawer .dr-body{flex:1;overflow-y:auto;padding:12px 13px 20px;-webkit-overflow-scrolling:touch;}
+  #drawer .dr-sec{margin-bottom:16px;}
+  #drawer .dr-sec h4{margin:0 0 7px;font-size:12px;letter-spacing:1px;color:var(--ink-soft);font-weight:400;}
+  #drawer .dr-btn{display:block;width:100%;text-align:left;padding:9px 12px;margin-bottom:6px;
+    font-size:13px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    cursor:pointer;font-family:inherit;letter-spacing:1px;}
+  #drawer .dr-btn.on{background:var(--teal);color:#fff;border-color:var(--teal);}
+  #drawer .dr-note{font-size:11px;color:var(--ink-soft);line-height:1.7;margin:6px 0 0;}
+  /* 被搬进抽屉的元素：在这里必须重新显示（紧凑模式下它们在页面流里是 display:none） */
+  #drawer .board,#drawer .hint{display:block;margin:0;}
+  #drawer .board{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-start;}
+  #drawer .hint{max-width:none;}
+  @media (max-width:620px){
+    #drawer{top:auto;left:0;right:0;bottom:0;width:auto;height:74dvh;
+      border-radius:16px 16px 0 0;border-left:none;border-top:1px solid var(--line);
+      transform:translateY(103%);}
+    #drawer.on{transform:none;}
+  }
   /* 地铁版：家园进度 + 建设家园面板 */
   #homeWrap{display:none;}
   #homeWrap.show{display:inline;}
@@ -322,6 +370,13 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     <button id="autoBtn">托管</button>
     <button id="achFloatBtn">🏆 大图</button>
     <div id="feed"></div>
+    <div class="fab">
+      <button id="fabSet"   title="设置：模式 / 线路 / 城市 / 全屏 / 托管">⚙</button>
+      <button id="fabRank"  title="排行榜">🏅</button>
+      <button id="fabGal"   title="站卡图鉴">🗂</button>
+      <button id="fabAch"   title="成就大图">🏆</button>
+      <button id="fabHelp"  title="玩法说明">📋</button>
+    </div>
     <div id="stick"><div id="stickKnob"></div></div>
     <div class="overlay" id="startOverlay">
       <h2 id="ovH2">贪吃蛇 · 开放世界</h2>
@@ -377,6 +432,13 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
       <button id="achClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
     </div>
   </div>
+
+  <div id="drawerMask"></div>
+  <div id="drawer">
+    <div class="dr-head"><b id="drawerTitle">—</b><button class="dr-x" id="drawerX" aria-label="关闭">×</button></div>
+    <div class="dr-body" id="drawerBody"></div>
+  </div>
+
   <div id="cardLayer"></div>
   <div id="trPanel">
     <div class="tr-t">在 <b id="trStation">—</b> 换乘到哪条线？<span class="tr-left">⏸ 已暂停 · 剩余 <b id="trCount">5.0s</b></span></div>
@@ -1294,6 +1356,18 @@ var achInfoEl=document.getElementById("achInfo");
     var on=document.body.classList.toggle("hint-on");
     helpB.textContent=on?"收起":"玩法";
   };
+  /* 抽屉触发：右上角小圆钮 + 遮罩点击关闭 */
+  var fS=document.getElementById("fabSet"), fR=document.getElementById("fabRank"),
+      fG=document.getElementById("fabGal"),  fA=document.getElementById("fabAch"),
+      fH=document.getElementById("fabHelp"), dX=document.getElementById("drawerX"),
+      dM=document.getElementById("drawerMask");
+  if(fS) fS.onclick=function(){ drawerKind==="set"?closeDrawer():openDrawer("set"); };
+  if(fR) fR.onclick=function(){ drawerKind==="rank"?closeDrawer():openDrawer("rank"); };
+  if(fH) fH.onclick=function(){ drawerKind==="help"?closeDrawer():openDrawer("help"); };
+  if(fG) fG.onclick=function(){ openGallery(); };
+  if(fA) fA.onclick=function(){ openAchieve(); };
+  if(dX) dX.onclick=closeDrawer;
+  if(dM) dM.onclick=closeDrawer;
   var ach=document.getElementById("achBtn");
   if(ach) ach.onclick=openAchieve;
   var achF=document.getElementById("achFloatBtn");
@@ -1357,12 +1431,15 @@ function applyMobile(){
 }
 function resize(){
   applyMobile();                    // 先定形态，再量尺寸（否则读到的是旧布局）
+  applyCpt();
   if(fsMode){                       // 全屏：铺满视口（横屏时视野更宽）
     canvas.style.height = "";
   } else if(isMobile){
     canvas.style.height = "";       // 手机：交给 CSS（height:100% 撑满 .stage 的剩余高度）
-  } else {                          // 常规：保持正方形
-    canvas.style.height = (canvas.clientWidth||380)+"px";
+  } else {                          // 常规：默认正方形，但不允许高过视口（否则又得滚动页面）
+    var avail = Math.max(260, (window.innerHeight||800) -
+      (document.body && document.body.classList.contains("cpt") ? 108 : 300));
+    canvas.style.height = Math.min(canvas.clientWidth||380, avail)+"px";
   }
   var cssW = canvas.clientWidth || 380;
   var cssH = canvas.clientHeight || cssW;   // 读实际布局尺寸（会触发回流）
@@ -2984,6 +3061,103 @@ function renderFeed(){
   /* CSS 动画负责淡出；这里只做条数上限，旧条目随下一次播报被顶掉 */
   if(feedArr.length>3){ feedArr.splice(0,feedArr.length-3); }
 }
+/* ══════════ 抽屉：把工具栏 / 排行榜 / 说明收进画布角上的小圆钮 ══════════
+   元素不是新建副本，而是「搬进抽屉再搬回原位」——
+   这样 updateBoard() 之类的既有代码完全不用改，也不会出现两份 DOM 不同步。 */
+var CPT_KEY="snake_cpt";
+var drawerKind="", drawerPaused=false;
+function applyCpt(){
+  var on=true;
+  try{ on=localStorage.getItem(CPT_KEY)!=="0"; }catch(e){}
+  if(document.body) document.body.classList.toggle("cpt", on);
+  return on;
+}
+function stash(el){ if(el && !el.__stash) el.__stash={p:el.parentNode, n:el.nextSibling}; }
+function unstash(el){
+  if(!el || !el.__stash) return;
+  var st=el.__stash;
+  if(st.n && st.n.parentNode===st.p) st.p.insertBefore(el, st.n);
+  else st.p.appendChild(el);
+}
+function drawerReturn(){
+  var b=document.getElementById("board"), hn=document.querySelector(".hint");
+  unstash(b); unstash(hn);
+}
+function closeDrawer(){
+  var d=document.getElementById("drawer"), mk=document.getElementById("drawerMask");
+  if(!d) return;
+  d.classList.remove("on"); if(mk) mk.classList.remove("on");
+  drawerReturn();
+  var k, fab=document.querySelectorAll(".fab button");
+  for(k=0;k<fab.length;k++) fab[k].classList.remove("on");
+  drawerKind="";
+  if(drawerPaused){ drawerPaused=false; paused=false;   // 恢复打开抽屉前的运行态
+    var pb=document.getElementById("pauseBtn"); if(pb) pb.textContent="暂停";
+    lastTick=performance.now(); }
+}
+function openDrawer(kind){
+  var d=document.getElementById("drawer"), mk=document.getElementById("drawerMask");
+  var body=document.getElementById("drawerBody"), ttl=document.getElementById("drawerTitle");
+  if(!d||!body) return;
+  if(drawerKind==="rank"||drawerKind==="help") drawerReturn();
+  /* 打开抽屉 = 暂停（实时游戏里翻排行榜不该被撞死） */
+  if(!drawerPaused && running && !paused){ drawerPaused=true; paused=true;
+    var pb0=document.getElementById("pauseBtn"); if(pb0) pb0.textContent="继续"; }
+  drawerKind=kind;
+  var fab=document.querySelectorAll(".fab button");
+  for(var k=0;k<fab.length;k++) fab[k].classList.remove("on");
+  var map={set:"fabSet",rank:"fabRank",help:"fabHelp"};
+  if(map[kind]){ var fb=document.getElementById(map[kind]); if(fb) fb.classList.add("on"); }
+  body.innerHTML="";
+  if(kind==="set"){
+    ttl.textContent="设置";
+    var h='<div class="dr-sec"><h4>玩法</h4>'+
+      '<button class="dr-btn'+(mode==="battle"?" on":"")+'" data-a="mode">'+(mode==="battle"?"模式：大作战（撞身即死）":"模式：开放世界（撞身掉肉）")+'</button>'+
+      '<button class="dr-btn" data-a="line">切换线路</button>'+
+      '<button class="dr-btn" data-a="city">切换城市</button>'+
+      '<button class="dr-btn" data-a="auto">'+(autoMode?"托管中 · 点此接管":"托管（AI 代打，无敌）")+'</button>'+
+      '<button class="dr-btn" data-a="fs">'+(fsMode?"退出全屏":"全屏（手机自动横屏）")+'</button>'+
+      '</div>';
+    if(MODE.lineBased) h+='<div class="dr-sec"><h4>本局目标</h4><div class="dr-note">把全网车站卡片都点亮 —— HUD 上的「全网 X / '+NET_TARGET+'」就是进度。吃到换乘站可以跳线，各线进度分别保留。</div></div>';
+    /* 布局是双向的：紧凑↔经典。按钮文案随当前状态变，否则切过去就回不来 */
+    var cptNow=document.body.classList.contains("cpt");
+    h+='<div class="dr-sec"><h4>界面</h4><button class="dr-btn" data-a="classic">'+
+       (cptNow?"切换回经典布局（显示工具栏）":"切回紧凑布局（收进右上角小圆钮）")+'</button>'+
+       '<div class="dr-note">'+(cptNow
+         ? "经典布局把工具栏、排行榜、说明都摊在页面上；紧凑布局（当前）把它们收进右上角的小圆钮。"
+         : "紧凑布局把工具栏、排行榜、说明都收进右上角的小圆钮；经典布局（当前）全部摊开在页面上。")+
+       '</div></div>';
+    body.innerHTML=h;
+  } else if(kind==="rank"){
+    ttl.textContent="排行榜";
+    var b=document.getElementById("board");
+    stash(b); if(b) body.appendChild(b);
+    updateBoard();
+    body.insertAdjacentHTML("beforeend",
+      '<div class="dr-note">名次按全场计算 · 高亮那条是你。地铁版是「当班制」，只有部分线路在场，名次也按在场的算。</div>');
+  } else if(kind==="help"){
+    ttl.textContent="玩法说明";
+    var hn=document.querySelector(".hint");
+    stash(hn); if(hn) body.appendChild(hn);
+  }
+  d.classList.add("on"); if(mk) mk.classList.add("on");
+  var bs=body.querySelectorAll(".dr-btn");
+  for(var i2=0;i2<bs.length;i2++){
+    (function(btn){
+      btn.onclick=function(){
+        var a=btn.getAttribute("data-a");
+        if(a==="mode"){ setMode(mode==="open"?"battle":"open"); openDrawer("set"); }
+        else if(a==="line"){ closeDrawer(); openLinePicker(); }
+        else if(a==="city"){ closeDrawer(); openCityPicker(); }
+        else if(a==="auto"){ setAuto(!autoMode); openDrawer("set"); }
+        else if(a==="fs"){ setFs(!fsMode); openDrawer("set"); }
+        else if(a==="classic"){ var toCpt=!document.body.classList.contains("cpt");
+          try{ localStorage.setItem(CPT_KEY, toCpt?"1":"0"); }catch(e){}
+          applyCpt(); openDrawer("set"); resize(); draw(0); }
+      };
+    })(bs[i2]);
+  }
+}
 function updateBoard(){
   if(!snakes.length) return;
   var sorted=snakes.slice().sort(function(a,b){return b.score-a.score;});
@@ -3109,6 +3283,7 @@ function setDir(nx,ny){
 var lastDirKey="", lastDirTime=0;
 window.addEventListener("keydown",function(e){
   var k=e.key.toLowerCase(), dk="";
+  if(drawerKind && (k==="escape"||k===" ")){ closeDrawer(); e.preventDefault(); return; }
   if(transferPaused && (k==="escape"||k===" "||k==="enter")){ finishTransfer(-1); e.preventDefault(); return; }
   if(cardPaused&&(k===" "||k==="enter"||k==="escape")){ closeCard(); e.preventDefault(); return; }
   if(k==="arrowup"||k==="w"){setDir(0,-1);dk="u";e.preventDefault();}
