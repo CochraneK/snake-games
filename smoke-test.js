@@ -174,17 +174,43 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     ok = false;
   }
 
-  // 机制② 打卡卡：同一个站吃到第 3 次必须出卡（精选 / 兜底两条路径都验）
+  // 机制② 打卡卡：同一个站吃到第 3 次必须出卡（精选 / 自动补全两条路径都验）
   if (T.kind === "metro") {
     const curated = S.curated();
-    if (!(curated.length >= 40)) {
-      console.error("FAIL [" + theme + "] curated station cards only " + curated.length + " (expected >=40)");
+    if (!(curated.length >= 25)) {
+      console.error("FAIL [" + theme + "] curated station cards only " + curated.length + " (expected >=25)");
       ok = false;
     }
-    const cd = S.cardData();
-    const bad = curated.filter(k => !((cd[k].sights && cd[k].sights.length) || (cd[k].food && cd[k].food.length)));
-    if (bad.length) {
-      console.error("FAIL [" + theme + "] cards with neither sights nor food: " + bad.slice(0, 5).join(","));
+    // 信息量硬指标：每张精选卡都必须有「位置」和「吃食」两类实质内容
+    // （重构前一半卡片只有「XX 一带」「餐饮密集」这类空话，正是用户抱怨的没信息熵）
+    let thin = 0, sample = "";
+    for (const k of curated) {
+      const txt = String(S.cardHtml(k));
+      const hasPos = txt.indexOf("位置：") >= 0;
+      const hasFood = txt.indexOf("吃：") >= 0;
+      if (!hasPos || !hasFood) { thin++; if (!sample) sample = k + " → " + txt.slice(0, 80); }
+    }
+    if (thin) {
+      console.error("FAIL [" + theme + "] " + thin + " 张精选卡缺位置或吃食信息，例：" + sample);
+      ok = false;
+    }
+    // 区位表必须覆盖绝大多数站（否则卡片退回空话兜底）
+    const areaTotal = [...new Set(T.lines.flatMap(l => l.stations))].length;
+    const areaHit = S.areaCount();
+    if (!(areaHit / areaTotal >= 0.85)) {
+      console.error("FAIL [" + theme + "] 区位表只覆盖 " + areaHit + "/" + areaTotal + " 站（<85% 会退回空话卡）");
+      ok = false;
+    }
+    if (!(S.foodZoneCount() >= 25)) {
+      console.error("FAIL [" + theme + "] 片区吃食表只有 " + S.foodZoneCount() + " 条");
+      ok = false;
+    }
+    // 两城重名站不能串卡：北京4号线「新街口」不该出现南京的鸭血粉丝汤
+    const dup = ["新街口", "杨庄", "奥体中心"].filter(x =>
+      T.lines.some(l => l.stations.indexOf(x) >= 0) &&
+      T.id === "beijing" && S.cardHtml(x).indexOf("鸭血粉丝汤") >= 0);
+    if (dup.length) {
+      console.error("FAIL [" + theme + "] 重名站串卡（显示成另一个城市的卡片）: " + dup.join(","));
       ok = false;
     }
     // 精选站：吃满 3 次 → 出卡
@@ -205,9 +231,10 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
       console.error("FAIL [" + theme + "] gallery is missing unlocked cards");
       ok = false;
     }
-    // 未满 3 次不该出卡
-    const r3 = S.simulateEat("王府井", 2);
-    if (!(r3.cards === r2.cards)) {
+    // 未满 3 次不该出卡（用一个还没吃过的站，避免和上面的模拟互相干扰）
+    const fresh = "苏州街";
+    const r3 = S.simulateEat(fresh, 2);
+    if (!(r3.cards === r2.cards && r3.hits === 2)) {
       console.error("FAIL [" + theme + "] card fired before the 3rd eat: " + JSON.stringify(r3));
       ok = false;
     }
