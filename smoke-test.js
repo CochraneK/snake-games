@@ -214,6 +214,38 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     console.log("  [" + theme + "] spread: spawnMinD=" + minD0.toFixed(1) + " zones=" + nonEmpty + "/64 maxZone=" + maxZone +
       " · cards=" + r3.count + " (curated " + curated.length + ")");
   }
+  // 机制③ 成就大图：布局必须有效（无 NaN、站点齐全、点开不炸），且点亮口径正确
+  if (T.kind === "metro") {
+    const net = S.net();
+    if (net.nan !== 0) { console.error("FAIL [" + theme + "] 线路图有 " + net.nan + " 个坐标异常"); ok = false; }
+    // 唯一站数必须等于所有线路站名去重后的数量（漏一个就说明建图有 bug）
+    const uniq = new Set();
+    for (const L of T.lines) for (const st of L.stations) uniq.add(st);
+    if (net.nodes !== uniq.size) {
+      console.error("FAIL [" + theme + "] 线路图节点 " + net.nodes + " ≠ 唯一站数 " + uniq.size);
+      ok = false;
+    }
+    // 最近两点间距：不能小于两倍最小半径（会叠在一起糊成一团）
+    if (!(net.minSep >= 1.5)) {
+      console.error("FAIL [" + theme + "] 线路图最小间距 " + (net.minSep || 0).toFixed(2) + " 过小（站点重叠）");
+      ok = false;
+    }
+    const hud0 = S.openAchieve();                 // 打开大图不应抛异常
+    if (!(hud0 && hud0.total === net.nodes)) {
+      console.error("FAIL [" + theme + "] 成就面板统计异常: " + JSON.stringify(hud0));
+      ok = false;
+    }
+    if (!S.drawAchieve()) { console.error("FAIL [" + theme + "] drawAchieve 未建立视图变换"); ok = false; }
+    // 点亮口径：吃过 3 次 = 已点亮；吃过 1 次 = 吃过待读卡
+    const lit0 = S.net().lit;
+    S.simulateEat("奥体中心", 1);
+    if (S.net().eat < 1) { console.error("FAIL [" + theme + "] 吃过 1 次没记进「吃过待读卡」"); ok = false; }
+    if (S.net().lit !== lit0) { console.error("FAIL [" + theme + "] 只吃 1 次就点亮亮了（口径错）"); ok = false; }
+    S.simulateEat("奥体中心", 2);
+    if (S.net().lit !== lit0 + 1) { console.error("FAIL [" + theme + "] 吃满 3 次没点亮"); ok = false; }
+    console.log("  [" + theme + "] 成就大图: " + net.nodes + " 站 / " + net.edges + " 段 · 最近间距 " +
+      net.minSep.toFixed(2) + " · 换乘 " + net.hub + " · 点亮 " + S.net().lit);
+  }
   console.log("PASS [" + theme + "] title ok · score=" + score + " · bitmap=" + g.width + "x" + g.height);
 }
 

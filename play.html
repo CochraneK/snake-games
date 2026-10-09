@@ -152,6 +152,30 @@
   .gal-tip{font-size:11px;color:var(--ink-soft);}
   .gal-empty{font-size:12px;color:var(--ink-soft);line-height:1.9;}
   #galBtn{font-size:11.5px;letter-spacing:1px;}
+  #achBtn{font-size:11.5px;letter-spacing:1px;}
+  /* 机制③：成就大图（全城线路图，点亮 = 打过卡的站） */
+  .overlay#achieve{justify-content:flex-start;gap:6px;padding:10px 12px;background:rgba(243,238,227,.97);overflow:auto;z-index:60;}
+  .ach-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;width:100%;}
+  .ach-head h2{margin:0;font-size:17px;letter-spacing:2px;}
+  .ach-stat{font-size:11.5px;color:var(--ink-soft);letter-spacing:.5px;}
+  .ach-bar{width:100%;height:7px;border-radius:5px;background:#e3dac6;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.06) inset;}
+  .ach-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f9b95,#d9a441);transition:width .4s ease;}
+  .ach-canvas-wrap{width:100%;height:min(62vh,580px);min-height:260px;}
+  #achCanvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;}
+  .ach-legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:10.5px;color:var(--ink-soft);}
+  .ach-tools{display:flex;gap:6px;justify-content:center;}
+  .ach-tools button{padding:4px 12px;font-size:11.5px;letter-spacing:1px;border-radius:14px;
+    background:linear-gradient(180deg,#fff,#efe7d6);color:var(--ink);border:1px solid var(--line);box-shadow:0 2px 0 rgba(0,0,0,.08);}
+  .ach-tools button.on{background:linear-gradient(180deg,var(--teal-2),var(--teal));color:#fff;border-color:var(--teal);}
+  .ach-legend span{display:inline-flex;align-items:center;gap:4px;}
+  .ach-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .lg-off{background:#cfc6b4;} .lg-eat{background:#fff;border:1.5px solid #8d8579;} .lg-lit{background:#d9a441;box-shadow:0 0 0 2px rgba(217,164,65,.3);}
+  .lg-hub{background:#fff;border:2px solid #3a3a40;}
+  #achInfo{min-height:15px;font-size:11.5px;color:var(--ink);}
+  #achFloatBtn{position:absolute;left:8px;top:80px;padding:5px 12px;font-size:12px;border-radius:14px;
+    background:rgba(255,255,255,.88);color:var(--ink);border:1px solid var(--line);
+    box-shadow:0 2px 6px rgba(0,0,0,.18);letter-spacing:1px;display:none;}
+  body.fs #achFloatBtn{display:block;}
 </style>
 </head>
 <body>
@@ -172,7 +196,8 @@
     <button id="switchLineBtn">切换线路</button>
     <button id="switchCityBtn">切换城市</button>
     <button id="fsBtn">全屏</button>
-    <button id="galBtn">🗂 站卡</button>
+    <button id="achBtn">🏆 成就图</button>
+    <button id="galBtn">🗂 站卡图鉴</button>
   </div>
 
   <div class="board" id="board"></div>
@@ -182,6 +207,7 @@
     <canvas id="mini" width="88" height="88"></canvas>
     <button id="fsFloatBtn">全屏</button>
     <button id="autoBtn">托管</button>
+    <button id="achFloatBtn">🏆 大图</button>
     <div id="stick"><div id="stickKnob"></div></div>
     <div class="overlay" id="startOverlay">
       <h2 id="ovH2">贪吃蛇 · 开放世界</h2>
@@ -208,7 +234,28 @@
       <h2>🗂 站卡图鉴</h2>
       <p id="galSub">还没解锁任何卡片</p>
       <div id="galList" class="gal-list"></div>
+      <button id="achGo" style="background:linear-gradient(180deg,#2f9b95,#1f6f6b);box-shadow:0 4px 0 #14524f;">看成就大图</button>
       <button id="galClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
+    </div>
+    <div class="overlay hidden" id="achieve">
+      <div class="ach-head">
+        <h2 id="achTitle">🏆 成就大图</h2>
+        <div class="ach-stat" id="achStats">—</div>
+      </div>
+      <div class="ach-bar"><i id="achBarIn"></i></div>
+      <div class="ach-canvas-wrap"><canvas id="achCanvas"></canvas></div>
+      <div class="ach-tools">
+        <button id="achViewMine" class="on">本线高亮</button>
+        <button id="achViewAll">全网着色</button>
+      </div>
+      <div id="achInfo">点一个站点看它的状态</div>
+      <div class="ach-legend">
+        <span><i class="lg-off"></i>还没去过</span>
+        <span><i class="lg-eat"></i>吃过、还没读卡</span>
+        <span><i class="lg-lit"></i>已点亮（吃过并读过卡片）</span>
+        <span><i class="lg-hub"></i>换乘站（多线）</span>
+      </div>
+      <button id="achClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
     </div>
   </div>
   <div id="cardLayer"></div>
@@ -655,6 +702,11 @@ var galleryEl=document.getElementById("cardGallery");
 var galListEl=document.getElementById("galList");
 var galSubEl=document.getElementById("galSub");
 var cardCountEl=document.getElementById("cardCount");
+/* 机制③ 成就大图：同样「声明 + 赋值」放在同一处，别分散到后面的模块段 */
+var achEl=document.getElementById("achieve"), achCv=document.getElementById("achCanvas");
+var achCtx=achCv.getContext("2d"), achStatsEl=document.getElementById("achStats");
+var achBarEl=document.getElementById("achBarIn"), achTitleEl=document.getElementById("achTitle");
+var achInfoEl=document.getElementById("achInfo");
 (function(){
   var gc=document.getElementById("galClose");
   if(gc) gc.onclick=function(){ galleryEl.classList.add("hidden"); };
@@ -662,6 +714,33 @@ var cardCountEl=document.getElementById("cardCount");
   if(cc) cc.onclick=openGallery;
   var gb=document.getElementById("galBtn");
   if(gb) gb.onclick=openGallery;
+  var ag=document.getElementById("achGo");
+  if(ag) ag.onclick=function(){ galleryEl.classList.add("hidden"); openAchieve(); };
+  var ach=document.getElementById("achBtn");
+  if(ach) ach.onclick=openAchieve;
+  var achF=document.getElementById("achFloatBtn");
+  if(achF) achF.onclick=openAchieve;
+  var achC=document.getElementById("achClose");
+  if(achC) achC.onclick=closeAchieve;
+  var vm1=document.getElementById("achViewMine"), va1=document.getElementById("achViewAll");
+  function setAchView(v){
+    ACH_VIEW=v;
+    if(vm1) vm1.classList.toggle("on", v==="mine");
+    if(va1) va1.classList.toggle("on", v==="all");
+    drawAchieve();
+  }
+  if(vm1) vm1.onclick=function(){ setAchView("mine"); };
+  if(va1) va1.onclick=function(){ setAchView("all"); };
+  if(achCv){
+    achCv.addEventListener("click",function(e){
+      var r=achCv.getBoundingClientRect();
+      achInfo(achPick((e.clientX||0)-r.left,(e.clientY||0)-r.top));
+    });
+    achCv.addEventListener("mousemove",function(e){
+      var r=achCv.getBoundingClientRect();
+      achInfo(achPick(e.clientX-r.left,e.clientY-r.top));
+    });
+  }
 })();
 
 /* ===== 状态 ===== */
@@ -706,7 +785,7 @@ function resize(){
   canvas.height = Math.round(cssH*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
-window.addEventListener("resize", function(){ resize(); if(!running) draw(0); });
+window.addEventListener("resize", function(){ resize(); if(!running) draw(0); drawAchieve(); });
 window.addEventListener("orientationchange", function(){
   setTimeout(function(){ updateOrientation(); if(!running) draw(0); },300);
 });
@@ -1096,7 +1175,9 @@ function onStationEaten(sn,f){
     sn.body.push({x:t.x,y:t.y}); sn.body.push({x:t.x,y:t.y});
     sn.popText="站卡 +2"; sn.popT=14;
     showCard(buildStationCard(f.name));
-  }
+    saveProgress();                          // 点亮状态存盘（成就大图要用）
+    updateCardCount();                       // HUD/按钮上的卡片数立刻跟上
+  } else if(n===1){ saveProgress(); updateCardCount(); }
 }
 /* 文字线：同一个字吃到第 N 次弹字符卡 */
 function onCharEaten(sn,f){
@@ -1105,7 +1186,8 @@ function onCharEaten(sn,f){
   var n=charHits[f.ch];
   if(n<CARD_AT) sn.popText = (n===1) ? "打卡 ✓" : ("打卡 "+n+"/"+CARD_AT+" · 再吃一次出卡");
   sn.popT=12;
-  if(n>=CARD_AT && !charCards[f.ch]){ charCards[f.ch]=1; showCard(buildCharCard(f.ch)); }
+  if(n>=CARD_AT && !charCards[f.ch]){ charCards[f.ch]=1; showCard(buildCharCard(f.ch)); saveProgress(); }
+  else if(n===1) saveProgress();
 }
 function updateCardCount(){
   if(!cardCountEl) return;
@@ -1142,6 +1224,333 @@ function openGallery(){
   galSubEl.textContent = names.length+chars.length ? ("已解锁 "+(names.length+chars.length)+" 张"+
       (locked?("　·　全网还有 "+locked+" 站待写卡片"):"　·　本站卡片已全部解锁")) : "";
   galleryEl.classList.remove("hidden");
+}
+
+/* ══════════════ 机制③：成就大图 ══════════════
+   一张「全城地铁线路图」，把当前城市所有线路的站点一次画全：
+     · 还没去过         → 淡灰小点
+     · 吃过、还没读卡→ 白心圈
+     · 已点亮         → 金色实心（= 吃掉过，并且弹出过这站的卡片）
+     · 换乘站         → 更大一圈（多线共用）
+   线路画成折线：整条线是淡色底；从「本线第一个已点亮站」到「最后一个已点亮站」
+   的那一段用线路色点亮 —— 于是进度会像电流一样沿着线路蔓延。
+   —— 线路图怎么来的？项目里没有任何坐标数据，靠「弹簧 + 斥力」力导向自动布局算出来
+   （固定种子 → 每次结果完全一致）。换乘站会自然成为枢纽：它被多条线的弹簧同时拉住。 */
+var NET=null, NET_KEY="", NETVIEW=null, ACH_VIEW="mine";   // mine=只上色本线 / all=全网着色
+var ACHIEVE_KEY="snake_achieve_";     // localStorage：按主题分别存进度
+function makeRng(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+/* ① 建图：节点 = 唯一站名，边 = 同线相邻站 */
+function buildGraph(){
+  var lines=THEME.lines, nodes=[], idx={}, edges=[], i, si;
+  for(i=0;i<lines.length;i++){
+    var st=lines[i].stations;
+    for(si=0;si<st.length;si++){
+      var nm=st[si];
+      if(idx[nm]===undefined){ idx[nm]=nodes.length; nodes.push({name:nm,x:0,y:0,ls:[],deg:0,hub:false}); }
+      var id=idx[nm];
+      if(nodes[id].ls.indexOf(lines[i].name)<0) nodes[id].ls.push(lines[i].name);
+      if(si>0) edges.push([idx[st[si-1]], id]);
+    }
+  }
+  for(i=0;i<edges.length;i++){ nodes[edges[i][0]].deg++; nodes[edges[i][1]].deg++; }
+  for(i=0;i<nodes.length;i++) nodes[i].hub = nodes[i].ls.length>1;
+  return {nodes:nodes, edges:edges, lines:lines, idx:idx};
+}
+/* ② 布局：轻弹簧 + 「硬分离」投影
+   ⚠ 踩过的坑：纯力导向（软斥力）不管用 —— 斥力一被距离截断，长距离就没有约束，
+     结果整张图向心坍缩成一个毛线球 + 几条甩出去的长线。
+     改成两步投影，每步都做：
+       ① 轻弹簧：把同线相邻站往「理想间距」拉（只做微调，不主导）
+       ② 硬分离：任意两点的距离不得小于 r_i+r_j（换乘站半径更大，周围留白更多）。
+          这条是「不糊成一团」的真正保证 —— 违反就强行推开，迭代几百次必然分开。
+     分离检测用空间网格只看邻近桶，所以可以跑很多次迭代也不慢（北京 410 站约 40ms）。 */
+/* ② 布局：弹簧 + 硬分离 + 角度拉直 + 交叉消除
+   ⚠ 踩过的坑（两次）：
+     1. 纯软斥力（力导向）→ 整张图向心坍缩成毛线球 + 几条甩出去的长线；
+     2. 只加硬分离 → 不糊了，但线路像锯齿一样互相穿，因为约束只管「不重叠」，
+        不管「线能不能穿过别人」。
+     现在四股力一起上，才能像一张真正的线路图：
+       ① 硬分离：两点不得近于半径和（保证不重叠、不糊）
+       ② 弹簧：同线相邻站维持理想间距（REST 要明显大于最小间距，线才舒展）
+       ③ 角度拉直：把每条线的折角往直线收 —— 这是可读性的关键
+       ④ 交叉消除：两条线段相交时沿中点连线把它们推开（每 CROSS_EVERY 轮做一次）
+   分离检测走空间网格，交叉检测全量对（504 条边 → 12.7 万对，每 10 轮一次），整张图约 40ms。 */
+function layoutNetwork(g){
+  var nodes=g.nodes, edges=g.edges, idx=g.idx, lines=g.lines, n=nodes.length;
+  var rng=makeRng(20261009), i, j, it, t, u, key;
+  var GOLD=2.39996323, REST=3.2, ITER=320, CW=2.6, CROSS_EVERY=10;
+  for(i=0;i<lines.length;i++){
+    var a=i*GOLD, ux=Math.cos(a), uy=Math.sin(a), st=lines[i].stations, L=st.length;
+    for(j=0;j<L;j++){
+      var nd=nodes[idx[st[j]]];
+      nd.x=ux*(j-(L-1)/2)*REST*1.15 + (rng()-0.5)*0.8;
+      nd.y=uy*(j-(L-1)/2)*REST*1.15 + (rng()-0.5)*0.8;
+    }
+  }
+  var px=new Float64Array(n), py=new Float64Array(n), rad=new Float64Array(n);
+  for(i=0;i<n;i++){
+    px[i]=nodes[i].x; py[i]=nodes[i].y;
+    rad[i]=1.05+0.34*Math.min(4,nodes[i].deg);   // 换乘站留白更多
+  }
+  var E=edges.length;
+  var e1x=new Int32Array(E), e1y=new Int32Array(E), e2x=new Int32Array(E), e2y=new Int32Array(E);
+  for(i=0;i<E;i++){ e1x[i]=edges[i][0]; e1y[i]=edges[i][1]; e2x[i]=edges[i][1]; e2y[i]=edges[i][0]; }
+  function pushApart(i2,j2){
+    var dx=px[j2]-px[i2], dy=py[j2]-py[i2], d2=dx*dx+dy*dy;
+    var want=rad[i2]+rad[j2];
+    if(d2>=want*want) return;
+    if(d2<1e-6){ dx=(rng()-0.5)*0.06; dy=(rng()-0.5)*0.06; d2=dx*dx+dy*dy+1e-6; }
+    var dd=Math.sqrt(d2), push=(want-dd)*0.5*0.62;
+    var ux2=dx/dd*push, uy2=dy/dd*push;
+    px[i2]-=ux2; py[i2]-=uy2; px[j2]+=ux2; py[j2]+=uy2;
+  }
+  function segCross(ax,ay,bx,by,cx,cy,dx2,dy2){
+    var d1=(bx-ax)*(cy-ay)-(by-ay)*(cx-ax);
+    var d2b=(bx-ax)*(dy2-ay)-(by-ay)*(dx2-ax);
+    var d3=(dx2-cx)*(ay-cy)-(dy2-cy)*(ax-cx);
+    var d4=(dx2-cx)*(by-cy)-(dy2-cy)*(bx-cx);
+    return ((d1>0&&d2b<0)||(d1<0&&d2b>0)) && ((d3>0&&d4<0)||(d3<0&&d4>0));
+  }
+  var grid={};
+  for(it=0; it<ITER; it++){
+    var fade=1-(it/ITER)*0.5;
+    var cleanup=(it>ITER-60);          // 最后 60 轮只做分离，把残余重叠彻底清掉
+    if(!cleanup){
+      // ① 弹簧：同线相邻站维持理想间距（只微调，不主导）
+      for(i=0;i<E;i++){
+        var a2=e1x[i], b2=e1y[i];
+        var dx=px[b2]-px[a2], dy=py[b2]-py[a2], d=Math.sqrt(dx*dx+dy*dy);
+        if(d<1e-4){ dx=(rng()-0.5)*0.05; dy=(rng()-0.5)*0.05; d=1e-4; }
+        var diff=d-REST;
+        var step=(diff>0 ? Math.min(diff,4)*0.05 : diff*0.05)*0.5;
+        var ux3=dx/d*step, uy3=dy/d*step;
+        px[a2]+=ux3; py[a2]+=uy3; px[b2]-=ux3; py[b2]-=uy3;
+      }
+      // ③ 角度拉直：把「前站—本站—后站」的折角往直线上收
+      for(i=0;i<lines.length;i++){
+        var st=lines[i].stations, L2=st.length;
+        for(j=1;j<L2-1;j++){
+          var ib=idx[st[j-1]], ic=idx[st[j]], id=idx[st[j+1]];
+          var mx=(px[ib]+px[id])*0.5, my=(py[ib]+py[id])*0.5;
+          var dx4=mx-px[ic], dy4=my-py[ic];
+          px[ic]+=dx4*0.16; py[ic]+=dy4*0.16;
+          px[ib]-=dx4*0.05; py[ib]-=dy4*0.05;
+          px[id]-=dx4*0.05; py[id]-=dy4*0.05;
+        }
+      }
+      // ④ 交叉消除：两条线段相交 → 沿两条线段中点的连线把它们推开
+      if(it%CROSS_EVERY===0){
+        for(i=0;i<E;i++){
+          var A=e1x[i], B=e1y[i];
+          for(j=i+1;j<E;j++){
+            var C=e2x[j], D=e2y[j];
+            if(A===C||A===D||B===C||B===D) continue;   // 共享端点不算交叉
+            if(!segCross(px[A],py[A],px[B],py[B],px[C],py[C],px[D],py[D])) continue;
+            var m1x=(px[A]+px[B])*0.5, m1y=(py[A]+py[B])*0.5, m2x=(px[C]+px[D])*0.5, m2y=(py[C]+py[D])*0.5;
+            var ddx=m1x-m2x, ddy=m1y-m2y, dd=Math.sqrt(ddx*ddx+ddy*ddy);
+            if(dd<1e-3){ ddx=(rng()-0.5); ddy=(rng()-0.5); dd=1; }
+            var push=0.16*fade;
+            var pxx=ddx/dd*push, pyy=ddy/dd*push;
+            px[A]+=pxx; py[A]+=pyy; px[B]+=pxx; py[B]+=pyy;
+            px[C]-=pxx; py[C]-=pyy; px[D]-=pxx; py[D]-=pyy;
+          }
+        }
+      }
+    }
+    // ② 硬分离放最后：任何前面的力都不能留下重叠
+    grid={};
+    for(i=0;i<n;i++){ key=(px[i]/CW|0)+","+(py[i]/CW|0); if(!grid[key]) grid[key]=[]; grid[key].push(i); }
+    for(key in grid){
+      var arr=grid[key], pt=key.split(","), bx=+pt[0], by=+pt[1], dxg, dyg, nb;
+      for(t=0;t<arr.length;t++) for(u=t+1;u<arr.length;u++) pushApart(arr[t],arr[u]);
+      for(dxg=-1;dxg<=1;dxg++) for(dyg=-1;dyg<=1;dyg++){
+        if(!dxg&&!dyg) continue;
+        nb=grid[(bx+dxg)+","+(by+dyg)]; if(!nb) continue;
+        for(t=0;t<arr.length;t++) for(u=0;u<nb.length;u++) pushApart(arr[t],nb[u]);
+      }
+    }
+    // ⑤ 轻微向心，防整体飘散
+    for(i=0;i<n;i++){ px[i]-=px[i]*0.0016; py[i]-=py[i]*0.0016; }
+  }
+  var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9, minD=1e9;
+  for(i=0;i<n;i++){
+    nodes[i].x=px[i]; nodes[i].y=py[i];
+    if(px[i]<minx)minx=px[i]; if(px[i]>maxx)maxx=px[i];
+    if(py[i]<miny)miny=py[i]; if(py[i]>maxy)maxy=py[i];
+  }
+  for(i=0;i<n;i++) for(j=i+1;j<n;j++){
+    var axx=px[i], ddx2=px[j]-axx, ddy2=py[j]-py[i], dd2=ddx2*ddx2+ddy2*ddy2;
+    if(dd2<minD) minD=dd2;
+  }
+  g.minSep=Math.sqrt(minD);
+  g.w=(maxx-minx)||1; g.h=(maxy-miny)||1; g.minx=minx; g.miny=miny;
+  return g;
+}
+function getNet(){
+  if(NET && NET_KEY===THEME.id) return NET;
+  NET=layoutNetwork(buildGraph()); NET_KEY=THEME.id; NETVIEW=null;
+  return NET;
+}
+/* —— 进度存取：打过卡/吃过都存下来，换设备、重开游戏不丢 —— */
+function saveProgress(){
+  try{ localStorage.setItem(ACHIEVE_KEY+THEME.id,
+    JSON.stringify({h:stationHits,c:cardsGot,g:charHits,k:charCards})); }catch(e){}
+}
+function loadProgress(){
+  try{
+    var raw=localStorage.getItem(ACHIEVE_KEY+THEME.id);
+    if(!raw) return;
+    var o=JSON.parse(raw)||{}, k;
+    if(o.h) for(k in o.h) if(!stationHits[k]) stationHits[k]=o.h[k];
+    if(o.c) for(k in o.c) if(o.c[k]) cardsGot[k]=1;
+    if(o.g) for(k in o.g) if(!charHits[k]) charHits[k]=o.g[k];
+    if(o.k) for(k in o.k) if(o.k[k]) charCards[k]=1;
+  }catch(e){}
+}
+/* 站点状态：0=没去过 1=吃过但没读卡 2=已点亮（吃过且弹过卡片） */
+function stationState(name){
+  if(cardsGot[name]) return 2;
+  if(stationHits[name]) return 1;
+  return 0;
+}
+function achStats(){
+  var g=getNet(), i, lit=0, eat=0, hub=0, hubLit=0;
+  for(i=0;i<g.nodes.length;i++){
+    var stt=stationState(g.nodes[i].name);
+    if(stt===2) lit++; else if(stt===1) eat++;
+    if(g.nodes[i].hub){ hub++; if(stt===2) hubLit++; }
+  }
+  return {total:g.nodes.length, lit:lit, eat:eat, hub:hub, hubLit:hubLit};
+}
+function updateAchievePanel(){
+  var s=achStats();
+  achTitleEl.textContent="🏆 成就大图 · "+THEME.label;
+  achStatsEl.textContent="已点亮 "+s.lit+" / "+s.total+" 站（"+(s.lit/Math.max(1,s.total)*100).toFixed(1)+"%）"+
+    "　·　吃过待读卡 "+s.eat+"　·　换乘枢纽 "+s.hubLit+"/"+s.hub;
+  achBarEl.style.width=(s.lit/Math.max(1,s.total)*100).toFixed(1)+"%";
+  return s;
+}
+function openAchieve(){
+  if(!achEl||!MODE.lineBased) return;
+  closeCard();                              // 别让刚弹出的卡片压在大图上
+  achEl.classList.remove("hidden");
+  updateAchievePanel();
+  drawAchieve();
+}
+function closeAchieve(){ if(achEl) achEl.classList.add("hidden"); }
+/* —— 画图：先铺全网淡色底 → 再点亮已走过的段 → 站点圆点 → 标签避让 —— */
+function drawAchieve(){
+  if(!achEl||!achCv||!MODE.lineBased) return;   // 文字版没有线路图
+  if(achEl.classList.contains("hidden")) return;
+  var W=achCv.clientWidth||900, H=achCv.clientHeight||500;
+  if(W<20||H<20) return;
+  var dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  achCv.width=Math.round(W*dpr); achCv.height=Math.round(H*dpr);
+  var c=achCtx; c.setTransform(dpr,0,0,dpr,0,0);
+  c.clearRect(0,0,W,H);
+  c.fillStyle="#f7f2e6"; c.fillRect(0,0,W,H);
+  var g=getNet(), nodes=g.nodes, idx=g.idx, pad=30;
+  var kx=(W-2*pad)/g.w, ky=(H-2*pad)/g.h;
+  var k=Math.min(kx,ky);
+  var ax=Math.min(1.32, kx/k), ay=Math.min(1.32, ky/k);   // 轻微各向拉伸，让图填满画布
+  kx=k*ax; ky=k*ay;
+  var ox=(W-g.w*kx)/2 - g.minx*kx, oy=(H-g.h*ky)/2 - g.miny*ky;
+  NETVIEW={s:k,kx:kx,ky:ky,ox:ox,oy:oy};
+  var i, j;
+  function PX(nd){ return ox+nd.x*kx; }
+  function PY(nd){ return oy+nd.y*ky; }
+  // 1) 全网底色：默认只把「玩家当前这条线」画成彩色，其余线路压成淡灰 ——
+  //    28 条线一起上色就是一团毛线，灰掉之后一眼看得见自己那条线
+  var onlyMine = ACH_VIEW!=="all";
+  var myLine = (player&&player.homeLine)?player.homeLine:null;
+  function lineAlpha(L){
+    if(!onlyMine) return 1;
+    return (myLine && L.name===myLine.name) ? 1 : 0;
+  }
+  c.lineJoin="round"; c.lineCap="round";
+  for(i=0;i<g.lines.length;i++){
+    var L0=g.lines[i], a0=lineAlpha(L0);
+    c.beginPath();
+    for(j=0;j<L0.stations.length;j++){
+      var q=nodes[idx[L0.stations[j]]];
+      if(j===0) c.moveTo(PX(q),PY(q)); else c.lineTo(PX(q),PY(q));
+    }
+    c.strokeStyle = a0 ? L0.color : "#ddd4c1";
+    c.globalAlpha = a0 ? 1 : 0.85;
+    c.lineWidth = a0 ? Math.max(2.8, k*0.26) : Math.max(1.4, k*0.11);
+    c.stroke();
+  }
+  c.globalAlpha=1;
+  // 2) 已点亮的段（本线第一个已点亮站 → 最后一个已点亮站）
+  for(i=0;i<g.lines.length;i++){
+    var Ln=g.lines[i], a=-1, b=-1, a1=lineAlpha(Ln);
+    for(j=0;j<Ln.stations.length;j++){
+      if(stationState(Ln.stations[j])===2){ if(a<0) a=j; b=j; }
+    }
+    if(a<0) continue;
+    c.beginPath();
+    for(j=a;j<=b;j++){
+      var q2=nodes[idx[Ln.stations[j]]];
+      if(j===a) c.moveTo(PX(q2),PY(q2)); else c.lineTo(PX(q2),PY(q2));
+    }
+    c.strokeStyle=a1?Ln.color:"#b9ac93"; c.globalAlpha=a1?1:0.9;
+    c.lineWidth=Math.max(2.6, k*(a1?0.30:0.16));
+    c.stroke();
+  }
+  c.globalAlpha=1;
+  // 3) 站点圆点
+  var rB=Math.max(2.1, k*0.115);
+  for(i=0;i<nodes.length;i++){
+    var nd=nodes[i], stt=stationState(nd.name);
+    var x=PX(nd), y=PY(nd), r=nd.hub?rB*1.55:rB;
+    c.beginPath(); c.arc(x,y,r,0,6.2832);
+    c.fillStyle = stt===2 ? "#d9a441" : (stt===1 ? "#ffffff" : "#c6bca6");
+    c.fill();
+    c.lineWidth = nd.hub?1.9:1.1;
+    c.strokeStyle = stt===2 ? "#a97d1c" : (nd.hub ? "#3a3a40" : "#a89e88");
+    c.stroke();
+    if(stt===2){                       // 已点亮：外面再加一圈光晕
+      c.beginPath(); c.arc(x,y,r+2.4,0,6.2832);
+      c.strokeStyle="rgba(217,164,65,.34)"; c.lineWidth=1.6; c.stroke();
+    }
+  }
+  // 4) 标签：先抢换乘站，再抢已点亮站；放不下就不画（避免糊成一团）
+  var boxes=[], order=[];
+  for(i=0;i<nodes.length;i++) if(nodes[i].hub) order.push(i);
+  for(i=0;i<nodes.length;i++) if(!nodes[i].hub&&stationState(nodes[i].name)===2) order.push(i);
+  var fs=Math.max(10,Math.min(13.5, k*0.55));
+  c.font=fs+"px 'STKaiti','KaiTi','楷体',sans-serif";
+  c.textAlign="center"; c.textBaseline="bottom";
+  for(i=0;i<order.length;i++){
+    var n3=nodes[order[i]], tw=n3.name.length*fs*0.62, x3=PX(n3), y3=PY(n3)-rB*1.6;
+    var bx=x3-tw/2-2, by=y3-fs, bw=tw+4, bh=fs+3, clash=false;
+    for(j=0;j<boxes.length;j++){
+      var B=boxes[j];
+      if(bx<B.x+B.w&&bx+bw>B.x&&by<B.y+B.h&&by+bh>B.y){ clash=true; break; }
+    }
+    if(clash) continue;
+    boxes.push({x:bx,y:by,w:bw,h:bh});
+    c.fillStyle = stationState(n3.name)===2 ? "rgba(42,37,29,.94)" : "rgba(78,73,64,.75)";
+    c.fillText(n3.name, x3, y3);
+  }
+}
+/* 点图上的站点 → 报状态 */
+function achPick(cx,cy){
+  if(!NETVIEW) return null;
+  var g=getNet(), best=null, bd=18*18;
+  for(var i=0;i<g.nodes.length;i++){
+    var x=NETVIEW.ox+g.nodes[i].x*NETVIEW.kx, y=NETVIEW.oy+g.nodes[i].y*NETVIEW.ky;
+    var dx=x-cx, dy=y-cy, d=dx*dx+dy*dy;
+    if(d<bd){ bd=d; best=g.nodes[i]; }
+  }
+  return best;
+}
+function achInfo(nd){
+  if(!nd){ achInfoEl.textContent="点一个站点看它的状态"; return; }
+  var stt=stationState(nd.name);
+  var stateTxt = stt===2 ? "已点亮 · 吃过并读过卡片" :
+                 (stt===1 ? "吃过 "+(stationHits[nd.name]||0)+" 次 · 读到第 "+CARD_AT+" 次就点亮" : "还没去过");
+  achInfoEl.textContent = nd.name+"　"+nd.ls.join(" / ")+(nd.hub?"（换乘站）":"")+"　—　"+stateTxt;
 }
 
 /* ===== 大作战机制 ===== */
@@ -1954,12 +2363,16 @@ function applyTheme(){
   document.getElementById("pageFoot").textContent = THEME.foot;
   var isMetro = MODE.lineBased;
   document.getElementById("homeWrap").classList.toggle("show", isMetro);
+  document.getElementById("achBtn").style.display = isMetro?"":"none";
   if(!isMetro && homePanel) homePanel.style.display="none";
 }
 
+loadProgress();          // 读回上次的打卡进度（成就大图点亮状态）
 applyTheme();
 resize(); reset(); setMode("open"); lastTime=performance.now(); draw(0);
 requestAnimationFrame(frame);
+/* ?map=1 直接进成就大图（也方便截图/分享链接） */
+try{ if(MODE.lineBased && new URLSearchParams(location.search).get("map")==="1") openAchieve(); }catch(e){}
 
 /* ===== 无头自检用的只读探针 =====
    整个脚本包在 IIFE 里，冒烟测试读不到顶层 var；
@@ -1987,6 +2400,17 @@ window.__SNAKE__={
   cardCount:function(){ return Object.keys(cardsGot).length+Object.keys(charCards).length; },
   foodCount:function(){ return food.length; },
   snakes:function(){ return snakes.length; },
+  /* 机制③：成就大图自检 —— 布局是否有效、点亮数对不对 */
+  net:function(){
+    var g=getNet(), bad=0, i;
+    for(i=0;i<g.nodes.length;i++){ var q=g.nodes[i]; if(!(q.x===q.x&&q.y===q.y&&isFinite(q.x)&&isFinite(q.y))) bad++; }
+    var s=achStats();
+    return {nodes:g.nodes.length, edges:g.edges.length, nan:bad, w:g.w, h:g.h, minSep:g.minSep,
+            total:s.total, lit:s.lit, eat:s.eat, hub:s.hub, hubLit:s.hubLit,
+            lightable:(s.lit+s.hubLit>=0)};
+  },
+  openAchieve:function(){ openAchieve(); return updateAchievePanel(); },
+  drawAchieve:function(){ drawAchieve(); return NETVIEW?true:false; },
   /* —— 以下两个仅供无头自检使用 ——
      simulateEat 模拟「玩家吃到某站 n 次」，验证 计数→弹卡→图鉴 整条链路；
      正常游玩不会调用它们。 */
