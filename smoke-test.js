@@ -365,6 +365,72 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     if (!keep) { console.error("FAIL [" + theme + "] 换乘后原线路的建设进度丢了"); ok = false; }
     console.log("  [" + theme + "] 换乘玩法: 玩家 " + S.playerLineName() + " · 目标 " + S.netTarget() + " 站 · 换乘进度保留=" + keep);
   }
+  // 机制⑤ 换乘选择：5 秒倒计时 + 蛇暂停 + 超时自动继续
+  if (T.kind === "metro") {
+    const hub = S.hubWithOptions();
+    if (!hub) { console.error("FAIL [" + theme + "] 找不到换乘站"); ok = false; }
+    else {
+      S.closeCard();
+      const before = S.isPaused();
+      S.showTransfer(hub);
+      let st = S.transferState();
+      // ① 弹面板时蛇必须暂停
+      if (!(st.paused && st.gamePaused)) {
+        console.error("FAIL [" + theme + "] 换乘面板没让游戏暂停: " + JSON.stringify(st));
+        ok = false;
+      }
+      // ② 倒计时应为 5 秒
+      if (st.ms !== 5000) {
+        console.error("FAIL [" + theme + "] 换乘倒计时不是 5 秒，而是 " + (st.ms / 1000) + "s");
+        ok = false;
+      }
+      if (!(st.left > 4000 && st.left <= 5000)) {
+        console.error("FAIL [" + theme + "] 倒计时初值异常: " + st.left);
+        ok = false;
+      }
+      // ③ 超时自动按「不换」处理并恢复游戏
+      let over = false;
+      for (let t = 0; t < 60 && !over; t++) over = S.tickTransfer(100);
+      if (!over) { console.error("FAIL [" + theme + "] 倒计时走完没有自动收起面板"); ok = false; }
+      if (S.isPaused() !== before) {
+        console.error("FAIL [" + theme + "] 超时后游戏没有恢复（原暂停状态 " + before + "）");
+        ok = false;
+      }
+      if (S.transferState().paused) {
+        console.error("FAIL [" + theme + "] 超时后仍处于「换乘暂停」状态");
+        ok = false;
+      }
+      // ④ 在倒计时内选择 → 真的换线，且恢复游戏
+      const lineBefore = S.playerLine();
+      S.showTransfer(hub);
+      const opts = S.transferOptionsFor(hub);
+      if (!opts.length) { console.error("FAIL [" + theme + "] 换乘站没有可换线路"); ok = false; }
+      else {
+        S.chooseTransfer(opts[0].lineIdx);
+        if (S.playerLine() === lineBefore) {
+          console.error("FAIL [" + theme + "] 在倒计时内选择后没有换线");
+          ok = false;
+        }
+        if (S.isPaused() !== before) {
+          console.error("FAIL [" + theme + "] 选择换乘后游戏没有恢复");
+          ok = false;
+        }
+      }
+      // ⑤ 主动按 Esc = 不换，游戏恢复
+      const line2 = S.playerLine();
+      S.showTransfer(hub);
+      S.chooseTransfer(-1);
+      if (S.playerLine() !== line2) {
+        console.error("FAIL [" + theme + "] 选择「不换」却换了线路");
+        ok = false;
+      }
+      if (S.isPaused() !== before) {
+        console.error("FAIL [" + theme + "] 「不换」后游戏没有恢复");
+        ok = false;
+      }
+    }
+    console.log("  [" + theme + "] 换乘选择: 5s 倒计时 + 暂停 + 超时自动继续 ✓");
+  }
   console.log("PASS [" + theme + "] title ok · score=" + score + " · bitmap=" + g.width + "x" + g.height);
 }
 

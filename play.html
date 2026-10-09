@@ -177,8 +177,14 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     padding:11px 15px;border-radius:12px;background:#fff;
     border:1px solid var(--line);box-shadow:0 10px 30px rgba(60,50,30,.35);max-width:92vw;}
   #trPanel.on{display:flex;animation:cardIn .2s ease-out;}
-  #trPanel .tr-t{font-size:13px;letter-spacing:1px;color:var(--ink);}
+  #trPanel .tr-t{font-size:13px;letter-spacing:1px;color:var(--ink);display:flex;align-items:baseline;
+    gap:10px;flex-wrap:wrap;justify-content:center;}
   #trPanel .tr-t b{color:var(--accent);}
+  #trPanel .tr-left{font-size:11px;color:var(--ink-soft);letter-spacing:.5px;}
+  #trPanel .tr-left b{color:var(--accent);font-size:12.5px;}
+  #trPanel .tr-bar{width:100%;height:5px;border-radius:4px;background:#e6dcc6;overflow:hidden;}
+  #trPanel .tr-bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#d9a441,#d2542a);
+    transition:width .1s linear;}
   #trPanel .tr-opts{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;}
   #trPanel .tr-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;
     border-radius:14px;border:2px solid #ccc;background:#fff;color:var(--ink);
@@ -305,9 +311,10 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
   </div>
   <div id="cardLayer"></div>
   <div id="trPanel">
-    <div class="tr-t">在 <b id="trStation">—</b> 换乘到哪条线？</div>
+    <div class="tr-t">在 <b id="trStation">—</b> 换乘到哪条线？<span class="tr-left">⏸ 已暂停 · 剩余 <b id="trCount">5.0s</b></span></div>
+    <div class="tr-bar"><i id="trBarIn"></i></div>
     <div class="tr-opts" id="trOpts"></div>
-    <button class="tr-skip" id="trSkip">不换，继续走本线</button>
+    <button class="tr-skip" id="trSkip">不换，继续走本线（Esc）</button>
   </div>
 
   <div id="homePanel" class="home-panel"></div>
@@ -327,6 +334,7 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     点「全屏」→ <b>自动转横屏</b>并铺满 · 点「托管」让 AI 代打（<b>无敌</b>，撞到不掉肉也不死）<br>
     <b>蛇头亮红圈 = 那一带挤成堆了，往空处走</b>；被围住会短暂免罚，可以挤出去<br>
     地铁版：<b>开局随机分配一条线路</b>；吃到<b>换乘站可以跳到别的线</b>（名字颜色会变，各线进度分别保留）；<br>
+    换乘选择时<b>蛇会暂停并给 5 秒倒计时</b>，不选就默认不换、继续走本线；<br>
     目标是<b>把全网车站卡片都点亮</b> —— HUD「全网 X / 410」就是进度；<br>
     同一个站累计吃到第 3 次弹出站卡（景点 / 历史 / 美食 / 换乘），图鉴见「🗂 站卡图鉴」<br>
     托管时动一下方向键即接管回来</div>
@@ -1818,6 +1826,12 @@ function openGallery(){
 var NET=null, NET_KEY="", NETVIEW=null, ACH_VIEW="mine";   // mine=只上色本线 / all=全网着色
 var ACHIEVE_KEY="snake_achieve_";     // localStorage：按主题分别存进度
 var pendingTransfer=null;              // 待确认的换乘 {sn,name,opts}
+var transferPaused=false, transferWasPaused=false, transferLeft=0;
+/* 换乘选择：弹面板时游戏暂停，给玩家 5 秒决定换不换、换成哪条。
+   为什么必须有倒计时：换乘站是全局最该做决策的时刻（111 个枢纽），
+   但玩家此刻正操控着一条蛇，不可能靠一个面板干等 —— 5 秒 + 暂停是唯一不打断节奏的做法。
+   倒计时结束 / 点「不换」/ 超过时限没选 → 默认不换，游戏继续。 */
+var TRANSFER_MS=5000;
 function showTransferPanel(){
   var p=document.getElementById("trPanel"), box=document.getElementById("trOpts");
   if(!p||!box||!pendingTransfer) return;
@@ -1829,16 +1843,48 @@ function showTransferPanel(){
       var b=document.createElement("button");
       b.className="tr-chip";
       b.innerHTML='<span class="sw" style="background:'+o.color+'"></span>'+o.name;
-      b.addEventListener("click",function(){ doTransfer(pendingTransfer.sn,o.lineIdx,pendingTransfer.name); hideTransferPanel(); });
+      b.addEventListener("click",function(){ finishTransfer(o.lineIdx); });
       box.appendChild(b);
     })(opts[i]);
   }
   p.classList.add("on");
+  // 暂停蛇（记住原状态，结束时恢复）
+  transferWasPaused=paused;
+  transferPaused=true;
+  paused=true;
+  // 倒计时：从 5.0 秒递减，剩余 ≤0 自动按「不换」处理
+  transferLeft=TRANSFER_MS;
+  var pb=document.getElementById("pauseBtn");
+  if(pb) pb.textContent="继续";
+  updateTransferCountdown();
+}
+/* 换乘倒计时（每帧调用，用 dt 递减，不依赖 setInterval，避免虚拟时间下的漂移） */
+function updateTransferCountdown(){
+  if(!transferPaused) return;
+  var el=document.getElementById("trCount");
+  if(el) el.textContent=(transferLeft/1000).toFixed(1)+"s";
+  var bar=document.getElementById("trBarIn");
+  if(bar) bar.style.width=Math.max(0,transferLeft/TRANSFER_MS*100).toFixed(1)+"%";
+}
+/* 结束换乘选择：li≥0 就换线；否则不换。无论哪种都恢复游戏。 */
+function finishTransfer(li){
+  if(!pendingTransfer){ hideTransferPanel(); return; }
+  var nm=pendingTransfer.name, sn=pendingTransfer.sn;
+  if(li>=0) doTransfer(sn, li, nm);
+  hideTransferPanel();
 }
 function hideTransferPanel(){
+  if(!pendingTransfer && !transferPaused){ var q=document.getElementById("trPanel"); if(q) q.classList.remove("on"); return; }
   pendingTransfer=null;
   var p=document.getElementById("trPanel");
   if(p) p.classList.remove("on");
+  if(transferPaused){
+    transferPaused=false;
+    paused=transferWasPaused;            // 恢复进入面板前的暂停状态
+    var pb=document.getElementById("pauseBtn");
+    if(pb) pb.textContent=paused?"继续":"暂停";
+    lastTick=performance.now();
+  }
 }
 function makeRng(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 /* ① 建图：节点 = 唯一站名，边 = 同线相邻站 */
@@ -2805,6 +2851,12 @@ function buildHomePanel(){
 function frame(now){
   requestAnimationFrame(frame);
   var dt=Math.min(64, now-lastTime); lastTime=now;
+  // 换乘倒计时：5 秒内不选就默认不换，游戏自动继续
+  if(transferPaused){
+    transferLeft-=dt;
+    updateTransferCountdown();
+    if(transferLeft<=0) finishTransfer(-1);
+  }
   if(running&&!paused){
     // 加速：双击/连点触发的一次冲刺；节奏恒定，只有玩家每拍多走一步
     if(player){
@@ -2833,6 +2885,7 @@ function setDir(nx,ny){
 var lastDirKey="", lastDirTime=0;
 window.addEventListener("keydown",function(e){
   var k=e.key.toLowerCase(), dk="";
+  if(transferPaused && (k==="escape"||k===" "||k==="enter")){ finishTransfer(-1); e.preventDefault(); return; }
   if(cardPaused&&(k===" "||k==="enter"||k==="escape")){ closeCard(); e.preventDefault(); return; }
   if(k==="arrowup"||k==="w"){setDir(0,-1);dk="u";e.preventDefault();}
   else if(k==="arrowdown"||k==="s"){setDir(0,1);dk="d";e.preventDefault();}
@@ -3177,6 +3230,20 @@ window.__SNAKE__={
     pendingTransfer={sn:player, name:nm, opts:transferOptions(player,nm)};
     showTransferPanel();
     return pendingTransfer.opts.length;
+  },
+  /* 换乘倒计时自检 */
+  transferState:function(){ return {paused:transferPaused, left:transferLeft, gamePaused:paused, ms:TRANSFER_MS}; },
+  tickTransfer:function(ms){          // 推进倒计时（ms），返回是否超时自动收起
+    if(!transferPaused) return false;
+    transferLeft-=ms;
+    if(transferLeft<=0){ finishTransfer(-1); return true; }
+    updateTransferCountdown();
+    return false;
+  },
+  chooseTransfer:function(li){        // 模拟点击某条线（li<0 = 不换）
+    if(!transferPaused) return {ok:false};
+    finishTransfer(li);
+    return {ok:true, line:player?player.lineIdx:-1};
   },
   historyOf:function(n){ return historyOf(n); },
   histStats:function(){
