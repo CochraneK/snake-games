@@ -238,6 +238,38 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
       console.error("FAIL [" + theme + "] card fired before the 3rd eat: " + JSON.stringify(r3));
       ok = false;
     }
+    // 弹卡必须暂停游戏，且关闭后恢复原状态（不然玩家在读卡时会被撞）
+    // 用一个全新的站：cardsGot 已解锁的站不会二次弹卡，拿旧站测会误判
+    S.closeCard();                              // 先清掉可能残留的卡片状态
+    const beforePause = S.isPaused();
+    S.simulateEat("五道口", 3);                 // 全新站 → 必然触发 showCard
+    if (S.keepCard().cardPaused !== true) {
+      console.error("FAIL [" + theme + "] 弹出卡片后没有进入「已暂停」状态");
+      ok = false;
+    }
+    if (S.isPaused() !== true) {
+      console.error("FAIL [" + theme + "] 弹出卡片后游戏未真正暂停（读卡时会被撞）");
+      ok = false;
+    }
+    S.closeCard();
+    if (S.isPaused() !== beforePause) {
+      console.error("FAIL [" + theme + "] 关闭卡片后暂停状态没恢复（原值 " + beforePause + "）");
+      ok = false;
+    }
+    // 已解锁的站不该二次弹卡（否则玩家会被同一张卡反复打断）
+    const cnt0 = S.net().total;
+    S.simulateEat("五道口", 3);
+    if (S.keepCard().cardPaused === true) {
+      console.error("FAIL [" + theme + "] 已解锁的站点重复弹卡了（玩家会被反复打断）");
+      ok = false;
+    }
+    S.closeCard();
+    // 历史沿革：选了站的历史条目，必须真的出现在卡片文本里
+    const hist = String(S.historyOf("天安门东") || "");
+    if (hist && String(S.cardHtml("天安门东")).indexOf("历史沿革") < 0) {
+      console.error("FAIL [" + theme + "] 有历史数据但卡片里没有「历史沿革」段");
+      ok = false;
+    }
     console.log("  [" + theme + "] spread: spawnMinD=" + minD0.toFixed(1) + " zones=" + nonEmpty + "/64 maxZone=" + maxZone +
       " · cards=" + r3.count + " (curated " + curated.length + ")");
   }

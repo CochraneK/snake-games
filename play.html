@@ -122,8 +122,8 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
     display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;
     gap:8px;padding:12px;pointer-events:none;overflow:hidden auto;}
   body.fs #cardLayer{left:auto;width:min(420px,46vw);bottom:auto;height:100dvh;}
-  .card{position:relative;width:min(392px,88vw);pointer-events:auto;overflow:hidden;
-    max-height:min(70vh,560px);                 /* 信息量变大后必须限高，否则一屏放不下 */
+  .card{position:relative;width:min(392px,88vw);pointer-events:auto;overflow:hidden auto;
+    max-height:min(88vh,700px);                 /* 内容有 6～7 段，必须限高+可滚动 */
     flex:0 0 auto;align-self:flex-end;
     background:#fff;border:1px solid var(--line);border-radius:12px;
     padding:10px 13px 13px;box-shadow:0 10px 30px rgba(60,50,30,.3);
@@ -143,6 +143,16 @@ z-index 要压过页面标题栏，否则半透明卡片会和标题文字重影
   .card-tip{font-size:11px;color:var(--ink-soft);line-height:1.55;border-top:1px dashed var(--line);
     padding-top:4px;margin-top:2px;}
   .card-src{font-size:9.5px;color:#a9a29a;margin-top:5px;letter-spacing:.5px;}
+  /* 弹卡即暂停：底部固定一条「已暂停 + 继续」，卡片内容再长也看得见 */
+  .card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    position:sticky;bottom:-13px;background:#fff;border-top:1px dashed var(--line);
+    margin:6px -13px -13px;padding:7px 13px 11px;z-index:2;}
+  .card-hint{font-size:10.5px;color:var(--accent);letter-spacing:.5px;}
+  .card-go{padding:5px 16px;font-size:12px;letter-spacing:1px;border-radius:13px;
+    background:linear-gradient(180deg,var(--teal-2),var(--teal));box-shadow:0 2px 0 #14524f;}
+  .card-sec b.lbl-hist{color:var(--accent);border-left-color:rgba(210,84,42,.4);}
+  /* 历史段用另一种底色，和「去哪/吃什么」区分开 */
+  .card-sec.hist{background:rgba(217,164,65,.08);border-radius:6px;padding:4px 6px 3px;}
   .card-bar{position:absolute;left:0;bottom:0;height:2.5px;width:100%;background:var(--gold);
     transform-origin:left;animation:cardBar linear forwards;}
   @keyframes cardBar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
@@ -704,6 +714,90 @@ function foodOfArea(area){
     for(j=0;j<list.length;j++) if(out.indexOf(list[j])<0) out.push(list[j]);
   }
   return out.length?out:null;
+}
+
+/* E 层：历史沿革。
+   这一层是「历史」的主要来源，优先级高于贴士里的常识。
+   写法上刻意避免编年表式的精确年份（容易写错），只写「这一站在历史上是什么」——
+   城池方位、皇家园林、铁路门户、老城集市⋯⋯ 有把握的才写。 */
+var HISTORY={
+beijing:{
+"天安门东":["明清皇城南门一带，天安门广场是北京城的政治中心","城楼与广场历经多次改建，见证开国大典与国庆阅兵"],
+"天安门西":["人民大会堂与国家博物馆一带，典型的「中轴线政务区」","这一带是北京中轴线上最庄重的一段"],
+"王府井":["因明代的王府得名，清末民初已成商业街","王府井小吃街与王府井百货是这一带的老招牌"],
+"前门":["正阳门是明北京内城正门，前门一带是明清通往外城的商道","老字号与老建筑密集，是北京商业史的活样本"],
+"崇文门":["崇文门是内城东南门，明代为皇室往来要道","明清时期这一带是骡马市与手工业集散地"],
+"雍和宫":["清代雍亲王府改建而成，是北京规格最高的藏传佛教寺院","原为雍亲王府，乾隆年间改作寺院"],
+"西直门":["西直门是元代大都的城门之一，明清为运粮进城的通道","城楼下曾设有瓮城，是内城与西直门商圈的门户"],
+"西单":["西单是元大都的重要坊门，明清为商业街","民国时期这里是新文化运动的重要场所，西单商场则是后来的地标"],
+"宣武门":["宣武门是内城西南门，明代为皇城西南门户","菜市口一带是清代刑场与老城商业区"],
+"复兴门":["复兴门是内城西南门，民国后改称复兴门","金融街在北京城西南一带集中，是今天的商务区"],
+"平安里":["平安里是元大都一条坊巷的遗存","这一带胡同密集，仍能看到旧城肌理"],
+"南锣鼓巷":["元代大都的胡同区，棋盘式胡同格局保存完好","这一片是北京现存最完整的元代胡同肌理之一"],
+"什刹海":["什刹海是元大都的水系遗迹，历史上是漕运码头","后海、前海一带保留了老北京的水岸人家"],
+"北海北":["北海公园是元代御苑「琼华岛」的延续","这里曾是皇家园林的一部分，湖岸与岛峦格局源自元明"],
+"景山":["景山是明代紫禁城后山，人工堆筑","从万春亭俯瞰中轴线是老北京最经典的视角"],
+"国贸":["国贸是北京最早成片开发的中央商务区之一","从北京站在此，象征城市经济重心的东移"],
+"大望路":["大望路一带是九十年代以后兴起的商务区","沿线高楼密集，是北京东部的天际线"],
+"五棵松":["五棵松体育馆是 2008 年奥运会篮球场馆","这一带从五棵松老树变成了北京西部赛事与商业中心"],
+"奥林匹克公园":["2008 年奥运会主场区，鸟巢与水立方","园区保留了奥运期间的景观与场馆群"],
+"中关村":["中关村是中国第一个国家级高新技术产业开发区","从「电子一条街」到创新高地，见证了中国的科技产业化进程"],
+"五道口":["五道口因五条道路交汇得名，曾是铁路道口","高校与外资书店聚集，是青年文化的地标"],
+"圆明园":["圆明园是清代皇家园林，1860 年被焚毁","遗址如今以废墟与湖泊形态保存，是历史课本之外的现场"],
+"北京大学东门":["北京大学是中国近代第一所国立综合性大学","未名湖畔的校区格局与红楼建筑群是近代教育遗产"],
+"清华大学东路西口":["清华学堂与老校区的东侧，清华园格局源自清华学堂时期","这一带高校与书院密集，是京西学术圈的核心"],
+"香山":["香山是京东八景「西山晴雪」所在地","曾是皇家园林「静宜园」，也是近代名人聚居之所"],
+"颐和园":["颐和园在清代乾隆年间大规模扩建，是皇家园林的集大成之作","万寿山与昆明湖的布局体现了江南园林与北方山水的结合"],
+"十三陵景区":["十三陵是明代十三位皇帝的陵寝群，长陵神道是其中轴","这一带是北京北部最重要的明代遗址群"],
+"北京西站":["北京西站 1996 年启用，是当时亚洲规模较大的铁路枢纽之一","这座车站本身就是九十年代北京城市建设的标志"],
+"北京南站":["北京南站原址是清末的永定门车站，2008 年重建为现址","它见证了从老火车站到现代化枢纽的更替"],
+"首都机场线":["首都机场线 2008 年与北京奥运会同期投入使用","它同时服务奥运旅客与机场通勤，是三线换乘的机场门户"],
+"2号航站楼":["北京首都国际机场 2 号航站楼是 2008 年前启用的主航站楼","中国第一条跑道国际航线在此起降的历史被记录在这里"],
+"大兴机场":["北京大兴国际机场 2019 年启用，是北京第二座国际机场","大兴机场线与机场同期开通，从大兴新城直达航站楼"],
+"亦庄":["亦庄是北京经济技术开发区，1990年代起形成","地铁亦庄线是北京第一条连接开发区的线路之一"],
+"琉璃厂":null,
+"通州北关":["通州北关一带与大运河漕运紧密相关","运河码头曾让这里成为京东粮米集散地"],
+"北运河西":["北运河是大运河北京段的水系","沿岸保留了运河码头与仓储遗迹"],
+"古城":["古城一带是燕城遗址区域，城墙尚有遗迹可寻","这一带的老城格局与北京城早期建设有关"],
+"颐和园西门":["这一带是京西山水路线上的节点","从西门进园可直达后山，是避开人潮的走法"],
+"雍和宫":null,
+"奥体中心":["奥体中心是 2008 年奥运会主场区的一部分","这组场馆在亚运会与大运会期间多次承办大赛"],
+"潘家园":["潘家园是北京最知名的旧货市场，每周六日开市","市场自发形成于 1980 年代，现已成收藏与民俗文化的聚集地"],
+"三里屯":null,
+"五道口":null
+},
+nanjing:{
+"新街口":["新街口是南京历史上最繁华的商业中心之一","民国时期这里就是中山路商圈的核心，今天仍是南京最热闹的口"],
+"夫子庙":["夫子庙一带是秦淮风光带的中心，文庙与科举遗迹并存","秦淮河沿岸的桨声灯影是南京最经典的意象"],
+"大行宫":["大行宫一带曾是大清的江宁织造与总统府所在","总统府与南京博物院都在这一带，是民国史的密集区"],
+"玄武门":["玄武门是南京古城墙的重要城门，六朝遗迹在此叠压","台城与玄武湖共同构成了南京最古老的城市景观层"],
+"鼓楼":["鼓楼是明代南京城的报时与报警中心","鼓楼与城墙一带的街巷格局保留着明代城市尺度"],
+"中华门":["中华门是明南京城聚宝门的原名，是现存最长的城堡门","瓮城结构在国内城门中极少见，俗称「藏兵洞」"],
+"中山门":["中山门是南京现存城门中最西的一座，正对紫金山","出城即为通往中山陵的近代陵园大道"],
+"苜蓿园":["苜蓿园一带靠近明孝陵与中山陵景区","钟山风景区的门户，明代皇陵与近代陵园在此交叠"],
+"孝陵卫":["孝陵卫因守陵卫所得名，紧邻明孝陵","这一带是明代皇陵与近代中山陵相邻的罕见格局"],
+"南京南站":["南京南站 2011 年启用，是当时亚洲规模较大的高铁站之一","京沪高铁的贯通让它成为长三角南下的门户"],
+"南京站":["南京站是 1968 年通车的华东铁路枢纽","浦口铁路与津浦铁路在此交汇，城市北门由此形成"],
+"玄武湖":["玄武湖又称后湖，历史上是六朝皇家园林的湖心","古鸡鸣寺与台城环绕，是南京城的历史原点"],
+"清凉山":["清凉山一带是石头城遗址，石姓氏族聚居于此","南唐时曾在此建有清凉殿，山下古井与庙宇众多"],
+"栖霞山":["栖霞山因栖霞寺得名，寺始建于南齐","红叶是这里的秋日名片，寺院与山景构成金陵胜景"],
+"燕子矶":["燕子矶是长江南岸的江矶，清代江防要地","从矶头可俯瞰长江与对岸幕府山，是观江地标"],
+"五塘广场":["五塘曾是南京的水利设施与渡口所在","五塘村的市井气息保留了老城北的民间质感"],
+"奥体中心":["南京奥体中心是 2005 年十运会主场馆","河西新城此后崛起，成为南京的新商务与居住中心"],
+"九龙湖":["九龙湖原为机场净空区内的湖泊","随大学城建设成为高校与湖景交织的片区"],
+"仙林中心":["仙林是南京主要的大学城片区","仙林大学城自1990年代起逐步建成，是南京高校最集中的地方"],
+"高淳":["高淳是南京最南端的区，古称高淳郡","慢城与水乡形态是老城之外的另一种南京"],
+"泰山新村":["泰山新村一带是浦口的老工业区与居民区","江北铁路的兴起让这里从乡村变成了城镇"],
+"秣陵":["秣陵是江宁的古称，六朝时期的重要军事与行政中心","这一带的秦淮河源流与古墓群见证着金陵南部的历史"],
+"乌衣":["乌衣巷是南京著名的历史地名，东晋王谢家族居所","一句「旧时王谢堂前燕」让这里成为文学记忆的坐标"]
+}};
+function historyOf(name){
+  var t=HISTORY[THEME.id];
+  if(!t) return null;
+  var v=t[name];
+  if(!v) return null;
+  if(v.length===1 && v[0]===null) return null;
+  return v;
 }
 
 /* D 层：从站名关键词自动判地标类别（比「XX 一带商圈」有信息量得多） */
@@ -1308,6 +1402,9 @@ function buildStationCard(name){
   if(tr.length>1) rows.push({label:"可换乘",items:tr.filter(function(x){return x!==L.name;})});
   var sights = (c&&c.sights&&c.sights.length) ? c.sights.slice(0,4) : landmarkOf(name);
   if(sights.length) rows.push({label:(c?"附近景点":"站点性质"),items:sights});
+  // 历史沿革（E 层）：有把握才写，位置放在景点之后、吃食之前
+  var hist=historyOf(name);
+  if(hist) rows.push({label:"历史沿革",items:hist});
   // 吃食分两行：「这一站附近」用手写精选（更具体），「这片区吃」用片区表（保底且有信息量）
   var own = (c&&c.food&&c.food.length) ? dedupeFood(c.food) : [];
   var zf  = dedupeFood(foodOfArea(area)||[]);
@@ -1343,32 +1440,55 @@ function cardHtml(name){
   if(cd.tip) h+='<div class="card-tip">'+esc(cd.tip)+'</div>';
   return h+'<div class="card-src">卡片内容：公开常识整理，未经实时核实 · 仅供趣味引导</div></div>';
 }
+/* 弹出站点卡 = 暂停游戏。
+   为什么要暂停：卡片现在有 6～7 段内容（位置/邻站/换乘/景点/历史/吃食/贴士），
+   边跑边读读不完；而且地铁版节奏只有 150ms 一拍，很容易「刚弹卡就被撞」。
+   做法：记住进入前是否已暂停 → 暂停 → 关闭卡片时恢复原状态。
+   不再自动关闭：内容变长后 6.5 秒不够读，改成手动「继续」/ 空格 / 点卡片外区域。 */
+var cardPaused=false, cardWasPaused=false;
 function showCard(cd){
   if(!cardLayerEl) return;
   var h='<div class="card-top"><span class="card-kicker">'+esc(cd.kicker)+'</span>'+
-        '<button class="card-x" aria-label="关闭">×</button></div>'+
+        '<button class="card-x" aria-label="关闭并继续">×</button></div>'+
         '<h3 class="card-title"><span class="card-dot" style="background:'+cd.color+'"></span>'+esc(cd.name)+'</h3>';
   for(var i=0;i<cd.rows.length;i++){
     var r=cd.rows[i];
     if(!r.items||!r.items.length) continue;
-    h+='<div class="card-sec"><b>'+esc(r.label)+'</b><ul>';
+    var isHist=(r.label==="历史沿革");
+    h+='<div class="card-sec'+(isHist?" hist":"")+'"><b'+(isHist?' class="lbl-hist"':'')+'>'+esc(r.label)+'</b><ul>';
     for(var k=0;k<r.items.length;k++) h+='<li>'+esc(r.items[k])+'</li>';
     h+='</ul></div>';
   }
   if(cd.tip) h+='<div class="card-tip">'+esc(cd.tip)+'</div>';
   h+='<div class="card-src">卡片内容：公开常识整理，未经实时核实 · 仅供趣味引导</div>'+
-     '<i class="card-bar" style="animation-duration:'+CARD_MS+'ms"></i>';
+     '<div class="card-foot"><span class="card-hint">⏸ 游戏已暂停，读完再继续</span>'+
+     '<button class="card-go">继续 ▸</button></div>';
   var el=document.createElement("div");
   el.className="card"; el.innerHTML=h;
   cardLayerEl.appendChild(el);
-  while(cardLayerEl.children && cardLayerEl.children.length>2) cardLayerEl.removeChild(cardLayerEl.firstChild);
+  while(cardLayerEl.children && cardLayerEl.children.length>1) cardLayerEl.removeChild(cardLayerEl.firstChild);
   el.querySelector(".card-x").onclick=closeCard;
-  if(cardTimer) clearTimeout(cardTimer);
-  cardTimer=setTimeout(closeCard, CARD_MS);
+  el.querySelector(".card-go").onclick=closeCard;
+  el.addEventListener("click",function(e){ if(e.target===el) closeCard(); });   // 点卡片空白处也行
+  // 暂停游戏（记住原状态）；卡片若已存在则不重复叠加
+  if(!cardPaused){
+    cardPaused=true; cardWasPaused=paused;
+    paused=true;
+    var pb=document.getElementById("pauseBtn");
+    if(pb) pb.textContent="继续";
+    pauseOverlay.classList.add("hidden");   // 不弹暂停面板，卡片本身就是提示
+  }
 }
 function closeCard(){
   if(cardTimer){ clearTimeout(cardTimer); cardTimer=null; }
   if(cardLayerEl) cardLayerEl.innerHTML="";
+  if(cardPaused){
+    cardPaused=false;
+    paused=cardWasPaused;                    // 恢复进入卡片前的暂停状态
+    var pb=document.getElementById("pauseBtn");
+    if(pb) pb.textContent=paused?"继续":"暂停";
+    lastTick=performance.now();
+  }
 }
 /* 吃到车站后的打卡逻辑（只统计玩家自己的蛇） */
 function onStationEaten(sn,f){
@@ -2319,6 +2439,7 @@ function setDir(nx,ny){
 var lastDirKey="", lastDirTime=0;
 window.addEventListener("keydown",function(e){
   var k=e.key.toLowerCase(), dk="";
+  if(cardPaused&&(k===" "||k==="enter"||k==="escape")){ closeCard(); e.preventDefault(); return; }
   if(k==="arrowup"||k==="w"){setDir(0,-1);dk="u";e.preventDefault();}
   else if(k==="arrowdown"||k==="s"){setDir(0,1);dk="d";e.preventDefault();}
   else if(k==="arrowleft"||k==="a"){setDir(-1,0);dk="l";e.preventDefault();}
@@ -2425,6 +2546,7 @@ if(("ontouchstart" in window) || navigator.maxTouchPoints>0) document.body.class
 
 function togglePause(){
   if(!running) return;
+  if(cardPaused){ closeCard(); return; }   // 卡片打开时空格 = 关卡片，不是切暂停面板
   paused=!paused;
   document.getElementById("pauseBtn").textContent=paused?"继续":"暂停";
   if(paused){ pauseScoreEl.textContent=player.score; pauseOverlay.classList.remove("hidden"); }
@@ -2608,8 +2730,11 @@ window.__SNAKE__={
   curated:function(){ var t=CARDS[THEME.id]; return t?Object.keys(t):Object.keys(CARDS); },
   cardData:function(){ var t=CARDS[THEME.id]; return t||CARDS; },
   cardCount:function(){ return Object.keys(cardsGot).length+Object.keys(charCards).length; },
-  /* 仅供截图：取消卡片自动关闭，好让无头截图能拍到卡片 */
-  keepCard:function(){ if(cardTimer){ clearTimeout(cardTimer); cardTimer=null; } },
+  /* 仅供无头截图：把卡片层做成「点击层」用（真实逻辑靠 card-foot 的按钮） */
+  keepCard:function(){ return {paused:paused, cardPaused:cardPaused}; },
+  closeCard:function(){ closeCard(); return {paused:paused, cardPaused:cardPaused}; },
+  isPaused:function(){ return paused; },
+  historyOf:function(n){ return historyOf(n); },
   foodCount:function(){ return food.length; },
   snakes:function(){ return snakes.length; },
   /* 机制③：成就大图自检 —— 布局是否有效、点亮数对不对 */
