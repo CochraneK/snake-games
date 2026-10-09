@@ -141,16 +141,29 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     console.error("FAIL [" + theme + "] player score " + score + " < 8 (did not survive/grow in open mode)");
     ok = false;
   }
-  // metro: every line must have its own snake (全线网出战), text modes = player + 6 bots
+  // metro: 当班制 —— 在场蛇数 = min(线路数, ACTIVE_CAP)，且在场蛇互不撞线；text modes = player + 6 bots
   const T = THEMES[theme] || THEMES["77"];
-  const wantSnakes = T.kind === "metro" ? T.lines.length : 7;
+  const ACTIVE_CAP = 12;
+  const wantSnakes = T.kind === "metro" ? Math.min(T.lines.length, ACTIVE_CAP) : 7;
   const rankTxt = String(sb.__els["rank"].textContent || "");
   const total = parseInt(rankTxt.split("/")[1], 10);
   if (total !== wantSnakes) {
     console.error("FAIL [" + theme + "] snakes=" + total + " expected " + wantSnakes + " (rank=" + rankTxt + ")");
     ok = false;
+  } else if (T.kind === "metro") {
+    // 在场蛇的线路必须互不相同（幽灵线机制下，「撞线」只会发生在玩家换乘后的短暂窗口）
+    const seen = new Set();
+    let dup = 0;
+    for (const sn of S.snakeLines()) {
+      if (!sn.alive || sn.isPlayer) continue;
+      if (seen.has(sn.lineIdx)) dup++;
+      seen.add(sn.lineIdx);
+    }
+    // 开局分配必须无撞线；运行中 AI 换乘可能造成短暂同线，属设计内，只提示不判失败
+    if (dup) console.log("  [" + theme + "] 运行中 AI 换乘造成同线 " + dup + " 条（设计内）");
+    else console.log("  [" + theme + "] snakes on board: " + total + " (cap " + ACTIVE_CAP + ", lines " + T.lines.length + ", no dup)");
   } else {
-    console.log("  [" + theme + "] snakes on board: " + total + (T.kind === "metro" ? " (one per line)" : ""));
+    console.log("  [" + theme + "] snakes on board: " + total);
   }
   // landscape bitmap ratio (the stretch-bug guard)
   const g = sb.__els["game"];
@@ -230,6 +243,15 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
     if (gh.indexOf("天安门东") < 0 || gh.indexOf("苏州桥") < 0) {
       console.error("FAIL [" + theme + "] gallery is missing unlocked cards");
       ok = false;
+    }
+    // 筛选行渲染出来了，且「历史遗存」筛选在天安门东（有历史沿革）下仍可见
+    if (gh.indexOf("gal-filters") < 0 || gh.indexOf("历史遗存") < 0) {
+      console.error("FAIL [" + theme + "] 图鉴筛选行缺失");
+      ok = false;
+    }
+    const hj = S.historyOf("天安门东");
+    if (hj && !/博物馆|纪念馆|遗址|城门|宫|门/.test(hj.join("；"))) {
+      console.log("  [" + theme + "] 天安门东历史不命中遗存关键词（仅提示，不算失败）");
     }
     // 未满 3 次不该出卡（用一个还没吃过的站，避免和上面的模拟互相干扰）
     const fresh = "苏州街";

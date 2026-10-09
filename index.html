@@ -29,6 +29,10 @@
   .card h2{margin:0 0 6px;font-size:21px;letter-spacing:3px;}
   .card p{margin:0;font-size:12px;color:var(--ink-soft);line-height:1.7;}
   .go{margin-top:12px;font-size:12px;color:var(--teal);letter-spacing:1px;}
+  .prog{margin-top:11px;height:5px;border-radius:3px;background:rgba(31,111,107,.12);overflow:hidden;}
+  .prog i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--teal-2),var(--teal));}
+  .prog-t{margin-top:5px;font-size:11px;color:var(--ink-soft);letter-spacing:.5px;
+    font-variant-numeric:tabular-nums;font-family:"PingFang SC","Microsoft YaHei",sans-serif;}
   .tip{margin-top:26px;font-size:11px;color:var(--ink-soft);max-width:560px;text-align:center;line-height:1.8;}
   .tip code{background:rgba(31,111,107,.10);color:var(--teal);padding:1px 6px;border-radius:6px;}
   .foot{margin-top:18px;font-size:11px;color:var(--ink-soft);letter-spacing:1px;}
@@ -47,23 +51,45 @@
   <div class="foot">Snake Games · 开放世界贪吃蛇引擎</div>
 
 <script>
-/* 与 play.html 的 THEMES 对应；新增版本时同步加一条 */
+/* 与 play.html 的 THEMES 对应；新增版本时同步加一条。
+   total = 全网站点数（点亮目标），bestKey 与 play.html 里的存档键一致 —— 入口页读这两个
+   就能把「玩到哪了」直接写在卡片上，不用进游戏才知道进度。 */
 const MENU = [
-  {id:"su",      label:"苏络",     kind:"text",  color:"#1f6f6b", desc:"蛇身是「苏络苏络…」文字链"},
-  {id:"77",      label:"77",       kind:"text",  color:"#1f6f6b", desc:"蛇身是「7777…」文字链"},
-  {id:"beijing", label:"北京地铁", kind:"metro", color:"#A9043B", desc:"每条蛇是一条真实地铁线路（28 条已开通线，真实站名串成蛇身，按真实相邻顺序建设家园）"},
-  {id:"nanjing", label:"南京地铁", kind:"metro", color:"#009ACE", desc:"每条蛇是一条真实地铁线路（16 条已开通线，真实站名串成蛇身，按真实相邻顺序建设家园）"}
+  {id:"su",      label:"苏络",     kind:"text",  color:"#1f6f6b", bestKey:"suluo_best",   desc:"蛇身是「苏络苏络…」文字链"},
+  {id:"77",      label:"77",       kind:"text",  color:"#1f6f6b", bestKey:"77_best",      desc:"蛇身是「7777…」数字链"},
+  {id:"beijing", label:"北京地铁", kind:"metro", color:"#A9043B", bestKey:"beijing_best", total:410,
+   desc:"每条蛇是一条真实地铁线路（真实站名串成蛇身，按真实相邻顺序建设家园）"},
+  {id:"nanjing", label:"南京地铁", kind:"metro", color:"#009ACE", bestKey:"nanjing_best", total:266,
+   desc:"每条蛇是一条真实地铁线路（真实站名串成蛇身，按真实相邻顺序建设家园）"}
 ];
 const grid=document.getElementById("grid");
-MENU.forEach(function(m){
+/* 读进度：点亮站卡数（snake_achieve_<id> 里的 c）+ 历史最长 */
+function progOf(m){
+  var lit=0, best=0;
+  try{
+    var o=JSON.parse(localStorage.getItem("snake_achieve_"+m.id)||"{}");
+    if(o&&o.c) lit=Object.keys(o.c).length;
+    best=parseInt(localStorage.getItem(m.bestKey)||"0",10)||0;
+  }catch(e){}
+  return {lit:lit,best:best};
+}
+/* 有进度的排前面：回来继续玩的人第一眼就看到自己那局 */
+var list=MENU.slice().sort(function(a,b){
+  var pa=progOf(a), pb=progOf(b);
+  return (pb.lit>0)-(pa.lit>0) || pb.best-pa.best;
+});
+list.forEach(function(m){
   var a=document.createElement("a");
   a.className="card"; a.href="play.html?theme="+m.id;
   var badge = m.kind==="metro" ? "地铁线" : "文字蛇";
-  a.innerHTML =
-    '<span class="badge '+m.kind+'">'+badge+'</span>'+
-    '<h2 style="color:'+m.color+'">'+m.label+'</h2>'+
-    '<p>'+m.desc+'</p>'+
-    '<div class="go">开始游玩 →</div>';
+  var p=progOf(m), prog="";
+  if(m.total) prog='<div class="prog"><i style="width:'+Math.min(100,p.lit/m.total*100)+'%"></i></div>'
+    +'<div class="prog-t">已点亮 '+p.lit+' / '+m.total+' 站'+(p.best?('　·　最长 '+p.best):'')+'</div>';
+  else if(p.best) prog='<div class="prog-t">历史最长 '+p.best+'</div>';
+  a.innerHTML = `<span class="badge ${m.kind}">${badge}</span>`
+    + `<h2 style="color:${m.color}">${m.label}</h2>`
+    + `<p>${m.desc}</p>` + prog
+    + `<div class="go">${(p.lit||p.best)?"继续游玩 →":"开始游玩 →"}</div>`;
   grid.appendChild(a);
 });
 </script>
