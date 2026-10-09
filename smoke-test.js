@@ -270,6 +270,14 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
       console.error("FAIL [" + theme + "] 有历史数据但卡片里没有「历史沿革」段");
       ok = false;
     }
+    // 历史沿革要覆盖到足够多的站（否则历史只是点缀，不是内容主体）
+    const hs = S.histStats()[theme] || 0;
+    if (!(hs >= 60)) {
+      console.error("FAIL [" + theme + "] 历史沿革只有 " + hs + " 条（应覆盖足够多的站）");
+      ok = false;
+    }
+    const cs = S.cardStats()[theme] || 0;
+    console.log("  [" + theme + "] 内容: 精选卡 " + cs + " 条 · 历史沿革 " + hs + " 条");
     console.log("  [" + theme + "] spread: spawnMinD=" + minD0.toFixed(1) + " zones=" + nonEmpty + "/64 maxZone=" + maxZone +
       " · cards=" + r3.count + " (curated " + curated.length + ")");
   }
