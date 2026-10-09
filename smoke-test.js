@@ -30,12 +30,15 @@ function ctxProxy() {
 
 function makeEl(id) {
   const el = {
-    id, style: {}, _l: {}, textContent: "", innerHTML: "",
+    id, style: {}, _l: {}, textContent: "", innerHTML: "", children: [],
+    firstChild: null,
     classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
     addEventListener(t, fn) { (this._l[t] = this._l[t] || []).push(fn); },
     removeEventListener() {},
     setAttribute() {}, getAttribute() { return null; },
-    appendChild() {}, querySelector() { return makeEl("q"); },
+    appendChild(c) { this.children.push(c); this.firstChild = this.children[0]; return c; },
+    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); this.firstChild = this.children[0] || null; return c; },
+    querySelector() { return makeEl("q"); },
     querySelectorAll() { return []; },
     getBoundingClientRect() { return { left: 0, top: 0, width: this.clientWidth || 800, height: this.clientHeight || 400 }; },
     getContext() { return ctxProxy(); },
@@ -122,6 +125,13 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
 
   // start game
   (sb.__els["startBtn"]._l.click || []).forEach(fn => fn());
+  const S = sb.__SNAKE__ || sb.window.__SNAKE__;
+  // 机制① 开局分散：这一刻刚 spawn 完，蛇头之间就该互相离得开
+  const minD0 = S.minHeadDist();
+  if (!(minD0 >= 4)) {
+    console.error("FAIL [" + theme + "] spawn min head distance " + minD0.toFixed(2) + " < 4 (snakes spawn on top of each other)");
+    ok = false;
+  }
   drive(sb, 300);
   // enable autopilot (托管) and run more
   (sb.__els["autoBtn"]._l.click || []).forEach(fn => fn());
@@ -149,6 +159,60 @@ for (const theme of ["su", "77", "cc", "beijing", "nanjing"]) {
   if (!(g.width === 1600 && g.height === 800)) {
     console.error("FAIL [" + theme + "] landscape bitmap " + g.width + "x" + g.height + " expected 1600x800");
     ok = false;
+  }
+  // 机制① 运行中的拥挤度：不再要求「互不接触」（那不现实），而是看豆子是否铺开
+  // 豆子分区均衡：不能全堆在少数分区里（那会把所有蛇吸到同一片）
+  const zones = S.zoneCounts();
+  const nonEmpty = zones.filter(v => v > 0).length;
+  const maxZone = Math.max(...zones);
+  if (!(nonEmpty >= 24)) {
+    console.error("FAIL [" + theme + "] only " + nonEmpty + "/64 zones have food (should spread map-wide)");
+    ok = false;
+  }
+  if (!(maxZone <= 9)) {
+    console.error("FAIL [" + theme + "] a zone holds " + maxZone + " beans (cap is 5 + kills/boost spill)");
+    ok = false;
+  }
+
+  // 机制② 打卡卡：同一个站吃到第 3 次必须出卡（精选 / 兜底两条路径都验）
+  if (T.kind === "metro") {
+    const curated = S.curated();
+    if (!(curated.length >= 40)) {
+      console.error("FAIL [" + theme + "] curated station cards only " + curated.length + " (expected >=40)");
+      ok = false;
+    }
+    const cd = S.cardData();
+    const bad = curated.filter(k => !((cd[k].sights && cd[k].sights.length) || (cd[k].food && cd[k].food.length)));
+    if (bad.length) {
+      console.error("FAIL [" + theme + "] cards with neither sights nor food: " + bad.slice(0, 5).join(","));
+      ok = false;
+    }
+    // 精选站：吃满 3 次 → 出卡
+    const r1 = S.simulateEat("天安门东", 3);
+    if (!(r1.hits >= 3 && r1.cards >= 1)) {
+      console.error("FAIL [" + theme + "] curated station card not unlocked after 3 eats: " + JSON.stringify(r1));
+      ok = false;
+    }
+    // 没写卡片的站：也应出兜底模板卡（任何站都有内容）
+    const r2 = S.simulateEat("苏州桥", 3);
+    if (!(r2.cards >= 2)) {
+      console.error("FAIL [" + theme + "] fallback card missing for un-curated station: " + JSON.stringify(r2));
+      ok = false;
+    }
+    // 图鉴里能看到这两张
+    const gh = String(S.galleryHtml() || "");
+    if (gh.indexOf("天安门东") < 0 || gh.indexOf("苏州桥") < 0) {
+      console.error("FAIL [" + theme + "] gallery is missing unlocked cards");
+      ok = false;
+    }
+    // 未满 3 次不该出卡
+    const r3 = S.simulateEat("王府井", 2);
+    if (!(r3.cards === r2.cards)) {
+      console.error("FAIL [" + theme + "] card fired before the 3rd eat: " + JSON.stringify(r3));
+      ok = false;
+    }
+    console.log("  [" + theme + "] spread: spawnMinD=" + minD0.toFixed(1) + " zones=" + nonEmpty + "/64 maxZone=" + maxZone +
+      " · cards=" + r3.count + " (curated " + curated.length + ")");
   }
   console.log("PASS [" + theme + "] title ok · score=" + score + " · bitmap=" + g.width + "x" + g.height);
 }

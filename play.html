@@ -115,6 +115,43 @@
     background:#fff;border:2px solid #ccc;color:#2a2a30;font-size:14px;cursor:pointer;font-family:inherit;}
   .line-chip.cur{box-shadow:0 0 0 3px rgba(217,164,65,.6);}
   .line-chip .sw{width:14px;height:14px;border-radius:4px;display:inline-block;}
+  /* 机制②：站点打卡卡（右上角浮层，不打断游戏） */
+  #cardLayer{position:fixed;right:10px;top:46px;z-index:45;display:flex;flex-direction:column;
+    gap:8px;align-items:flex-end;pointer-events:none;}
+  .card{position:relative;width:min(330px,84vw);pointer-events:auto;overflow:hidden;
+    background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;
+    padding:9px 11px 12px;box-shadow:0 8px 24px rgba(60,50,30,.26);
+    animation:cardIn .26s ease-out;}
+  @keyframes cardIn{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:none;}}
+  .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .card-kicker{font-size:10.5px;letter-spacing:1px;color:var(--gold);}
+  .card-x{border:none;background:#eee;color:#666;font-size:15px;line-height:1;
+    width:22px;height:22px;border-radius:11px;padding:0;box-shadow:none;font-family:inherit;}
+  .card-title{margin:4px 0 6px;font-size:18px;letter-spacing:2px;display:flex;align-items:center;gap:7px;}
+  .card-dot{width:12px;height:12px;border-radius:3px;display:inline-block;flex:0 0 auto;
+    box-shadow:0 0 0 1px rgba(0,0,0,.14) inset;}
+  .card-sec{margin-bottom:5px;font-size:12px;line-height:1.65;color:var(--ink);}
+  .card-sec b{display:block;font-size:11px;color:var(--teal);letter-spacing:1px;margin-bottom:1px;}
+  .card-sec ul{margin:0;padding-left:17px;}
+  .card-tip{font-size:11px;color:var(--ink-soft);line-height:1.6;border-top:1px dashed var(--line);
+    padding-top:5px;margin-top:2px;}
+  .card-src{font-size:9.5px;color:#a9a29a;margin-top:5px;letter-spacing:.5px;}
+  .card-bar{position:absolute;left:0;bottom:0;height:2.5px;width:100%;background:var(--gold);
+    transform-origin:left;animation:cardBar linear forwards;}
+  @keyframes cardBar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
+  /* 站卡图鉴 */
+  .gal-list{display:flex;flex-direction:column;gap:5px;max-height:46vh;overflow:auto;
+    width:min(430px,92%);text-align:left;padding-right:2px;}
+  .gal-row{display:flex;gap:7px;align-items:flex-start;background:#fff;border:1px solid var(--line);
+    border-radius:9px;padding:5px 8px;}
+  .gal-dot{width:11px;height:11px;border-radius:3px;margin-top:4px;flex:0 0 auto;
+    box-shadow:0 0 0 1px rgba(0,0,0,.14) inset;}
+  .gal-name{display:flex;flex-direction:column;font-size:12px;line-height:1.55;}
+  .gal-name b{font-size:13px;}
+  .gal-meta{font-size:10px;color:var(--ink-soft);}
+  .gal-tip{font-size:11px;color:var(--ink-soft);}
+  .gal-empty{font-size:12px;color:var(--ink-soft);line-height:1.9;}
+  #galBtn{font-size:11.5px;letter-spacing:1px;}
 </style>
 </head>
 <body>
@@ -124,6 +161,7 @@
   <div class="hud">
     <div>长度 <b id="score">0</b></div>
     <div id="nextWrap" style="display:none">下一站 <b id="nextSt">—</b></div>
+    <div id="cardWrap" style="display:none">站卡 <b id="cardCount">0</b></div>
     <div>最长 <b id="best">0</b></div>
     <div>排名 <b id="rank">-</b></div>
     <div id="homeWrap">家园 <b id="home">0/0</b></div>
@@ -134,6 +172,7 @@
     <button id="switchLineBtn">切换线路</button>
     <button id="switchCityBtn">切换城市</button>
     <button id="fsBtn">全屏</button>
+    <button id="galBtn">🗂 站卡</button>
   </div>
 
   <div class="board" id="board"></div>
@@ -165,7 +204,14 @@
       <div id="lineGrid" class="line-grid"></div>
       <button id="linePickerClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
     </div>
+    <div class="overlay hidden" id="cardGallery">
+      <h2>🗂 站卡图鉴</h2>
+      <p id="galSub">还没解锁任何卡片</p>
+      <div id="galList" class="gal-list"></div>
+      <button id="galClose" style="background:linear-gradient(180deg,#b9ab8c,#9c8d6c);box-shadow:0 4px 0 #6f6248;">关闭</button>
+    </div>
   </div>
+  <div id="cardLayer"></div>
 
   <div id="homePanel" class="home-panel"></div>
 
@@ -182,6 +228,8 @@
   <div class="hint"><b>手机：按住拖动 = 摇杆；连点两下 = 加速冲刺</b>（会掉豆子）<br>
     电脑：方向键 / WASD；<b>连按两次方向键 = 加速冲刺</b>；空格暂停<br>
     点「全屏」→ <b>自动转横屏</b>并铺满 · 点「托管」让 AI 代打（<b>无敌</b>，撞到不掉肉也不死）<br>
+    <b>蛇头亮红圈 = 那一带挤成堆了，往空处走</b>；被围住会短暂免罚，可以挤出去<br>
+    地铁版：<b>同一个站累计吃到第 3 次会弹出站卡</b>（附近景点 / 美食 / 换乘），图鉴见「🗂 站卡」<br>
     托管时动一下方向键即接管回来</div>
   <div class="foot" id="pageFoot">贪吃蛇</div>
 
@@ -218,6 +266,34 @@ const BOT_DECIDE=4;         // 每 4 拍才重新决策一次，其余时间直�
 const BOT_SIGHT=12;         // 只看得见 12 格内的豆子
 const BOT_MISS=0.07;        // 7% 概率乱转
 const BOT_START_LEN=5;      // 对手起步比玩家短
+
+/* ===== 机制①：空间秩序（防止几十条蛇挤成一坨）=====
+   问题：地图 64×64、豆子 170 个，AI 都是「朝最近的豆子冲」，
+        于是所有蛇会朝着同一片豆子汇聚 → 互相穿身 → 掉肉/撞死，变成「人堆」。
+   解法分四层：
+     1. 分区配额：把地图切成 8×8=64 个分区，每区豆子有上限，超了就往空区搬；
+     2. 分散选点：开局与补豆子都取「离所有蛇最远」的格子，而不是纯随机；
+     3. 个人空间：AI 选向时对「本格 + 前方 2 格的拥挤度」和「近处别的蛇头」加惩罚；
+     4. 尾随豁免 + 被围豁免：允许跟着别人的尾巴钻过去；四面被堵时短暂免罚，避免「被围必死」。
+   下面这些是旋钮，想更松/更挤自己调。 */
+const DN=8;                  // 密度分区边长（世界格）：64/8 = 8×8 = 64 个分区
+const ZONE_CAP=5;            // 单区豆子硬上限，超出的会被搬到空区
+const ZONE_SOFT=3;           // 单区豆子软上限，低于它才优先往这个区放
+const ZONE_HARD=7;           // 单区豆子硬上限：放豆子时超了就直接把豆子挪走（尸体一次掉几十颗，必须有硬约束）
+const SPREAD_SAMPLES=24;     // 选点采样次数，取其中「离所有蛇最远」的那个
+const CROWD_W=2.6;           // 拥挤惩罚权重（越大越厌挤）
+const CROWD_R=6;             // 判定拥挤的邻域半径（格）
+const CROWD_RING=13;         // 蛇头出现预警环的密度阈值
+const TAIL_SLACK=1;          // 允许跟随他人尾部的节数（对方这一拍正好腾空）
+const SQUEEZE_TICKS=10;      // 被围住时的免罚拍数
+const FOOD_REBALANCE=24;     // 每 24 拍重新平衡一次豆子分布
+
+/* ===== 机制②：站点打卡卡（同一站吃到第 N 次 → 弹卡片）=====
+   吃到车站只加长度太单调；同一站反复吃到时弹一张「站卡」，
+   讲这个站附近的美食、景点，附带换乘信息 —— 顺便起到「记住这条线经过哪儿」的作用。
+   卡片内容分三层：CARDS 精选站卡 → 换乘枢纽自动卡 → 兜底模板卡（任何站都有内容）。 */
+const CARD_AT=3;             // 同一站累计吃到第几次弹卡片
+const CARD_MS=6500;          // 卡片停留时长（毫秒，到点自动收起，不打断游戏）
 
 /* ===== 主题（多变体：文字蛇 / 地铁线） =====
    想加新版本？复制下面任意一项改 id/label/chars/颜色即可，引擎完全不用动。
@@ -369,12 +445,12 @@ const MODES = {
       return {x:x,y:y,ch:THEME.foodChars[(Math.random()*THEME.foodChars.length)|0],value:value||1};
     },
     onTick:function(){},
-    onEat:function(){},
+    onEat:function(sn,f){ onCharEaten(sn,f); },
     drawFood:function(f,FX,FY,pulse){ drawTextFood(f,FX,FY,pulse); },
     drawBody:function(pts,sn){ drawTextBody(pts,sn); },
     drawHeadLabel:function(){},
     drawOverlay:function(){},
-    updateHud:function(){},
+    updateHud:function(){ updateCardCount(); },
     buildPanel:function(){ if(homePanel) homePanel.style.display="none"; }
   },
   /* ───────── 模块 B：地铁线（每条蛇 = 一条线路，食物 = 真实车站） ───────── */
@@ -411,12 +487,12 @@ const MODES = {
               transfer:(tr&&tr.length>1)?tr.slice():null, value:value||1};
     },
     onTick:function(){ ensureNextStation(); },
-    onEat:function(sn,f){ if(sn.isPlayer) tryBuildHome(sn,f); },
+    onEat:function(sn,f){ if(sn.isPlayer){ tryBuildHome(sn,f); onStationEaten(sn,f); } },
     drawFood:function(f,FX,FY,pulse){ drawMetroFood(f,FX,FY,pulse); },
     drawBody:function(pts,sn){ drawMetroBody(pts,sn); },
     drawHeadLabel:function(H,sn){ drawMetroHeadLabel(H,sn); },
     drawOverlay:function(S,SH){ drawTransferHint(S,SH); },
-    updateHud:function(){ updateHome(); },
+    updateHud:function(){ updateHome(); updateCardCount(); },
     buildPanel:function(){ buildHomePanel(); }
   }
 };
@@ -436,6 +512,129 @@ function pickStation(){
   }
   return STATION_POOL[(Math.random()*STATION_POOL.length)|0];
 }
+/* ════════════════════════════════════════════════════════════════════════
+   站点卡片数据（机制②的一半）
+   —— 同一个站累计吃到第 CARD_AT 次，就弹一张卡片，讲这站附近的美食和景点。
+   卡片分三层，任何站都不会是空卡：
+     A 层 CARDS      精选站卡：手写景点/美食/贴士（下列条目）
+     B 层 换乘枢纽    ≥3 条线换乘的站：自动列出可换线路 + 枢纽定位
+     C 层 兜底模板    其余站：自动用线路数据拼一条（本线第 N 站 / 走向）
+   ⚠ 内容为「公开常识整理」，未经实时核实，只做趣味引导；
+     具体店铺、出入口、门票以现场/官方信息为准。
+   ⚠ 写卡片只写「品类 + 大致片区」，不虚构具体店名，避免误导。
+   ════════════════════════════════════════════════════════════════════════ */
+var CARDS={
+/* —— 北京 —— */
+"天安门东":{"sights":["天安门广场","中国国家博物馆","人民英雄纪念碑","正阳门"],"food":["烤鸭（王府井/前门一带老字号最集中）","炸酱面","卤煮、爆肚一类老北京小吃"],"tip":"过安检需提前预约；广场部分区域需预约参观。"},
+"天安门西":{"sights":["天安门广场西侧","人民大会堂","国家博物馆"],"food":["老字号小吃集中在西单、府右街一带"],"tip":"看升旗需提前预约并早到；周边单位多，安检排队久。"},
+"王府井":{"sights":["王府井步行街","故宫东华门","中国美术馆（东行）"],"food":["烤鸭老字号","老北京涮肉","传统点心"],"tip":"步行街人流量极大、节假日限流；出入口多，看指示牌。"},
+"前门":{"sights":["前门大街","正阳门城楼","大栅栏","北京坊"],"food":["烤鸭（此处最有代表性的一带）","门框胡同百年卤煮","爆肚、面茶"],"tip":"大栅栏一带老字号集中，有观光车。"},
+"崇文门":{"sights":["国瑞城","新世界百货","老城根遗址公园"],"food":["老北京炸酱面、爆肚","商场餐饮层"],"tip":"2 号线与 5 号线换乘，通道较长；新世界楼上可登高看城楼。"},
+"复兴门":{"sights":["复兴门立交","金融街","月坛方向"],"food":["金融街商场餐饮","西单商圈可步行过去"],"tip":"1 号线与 2 号线换乘；桥下就是两线的换乘通道。"},
+"西直门":{"sights":["西直门城楼遗址","京包铁路遗存","动物园方向"],"food":["西直门外大街小吃","老北京面馆"],"tip":"2/4/13 号线三线换乘，站内通道长；北侧即西二环。"},
+"雍和宫":{"sights":["雍和宫","国子监街","孔庙与国子监博物馆"],"food":["雍和宫素斋","国子监街的创意菜与咖啡","卤煮"],"tip":"香火旺、节假日排队；国子监街适合慢逛。"},
+"北新桥":{"sights":["北新桥老城片区","东四四条一带胡同"],"food":["老北京卤煮、家常菜","簋街（步行可达）"],"tip":"5 号线与首都机场线换乘。"},
+"东直门":{"sights":["东直门城楼","簋街","三里屯方向"],"food":["簋街火锅与烤串","老北京早餐"],"tip":"2/13 号线与机场线换乘；去机场在此换乘最省事。"},
+"北京站":{"sights":["北京站老建筑","东长安街","明城墙遗址（东南）"],"food":["站前北京小吃","王府井方向餐厅"],"tip":"市中心位置；大火车多在北侧广场。"},
+"西单":{"sights":["西单商业街","西单文化广场","灵境胡同"],"food":["商场餐饮层","烤鸭与老字号小吃"],"tip":"1 号线与 4 号线换乘，通道长；晚间最热闹。"},
+"宣武门":{"sights":["宣武门城楼","大观园","庄胜广场"],"food":["老北京面食","牛街方向的清真小吃可步行前往"],"tip":"2 号线与 4 号线换乘；出站南侧即牛街方向。"},
+"军事博物馆":{"sights":["中国人民革命军事博物馆","玉渊潭公园（东侧）"],"food":["三里河一带家常菜与机关食堂"],"tip":"需预约参观；周一闭馆。"},
+"公主坟":{"sights":["翠微百货、城乡贸易中心","玉渊潭公园（东）"],"food":["商场餐饮层","万寿路一带家常菜"],"tip":"1 号线与 10 号线换乘；早高峰换乘客流极大。"},
+"人民大学":{"sights":["中国人民大学校园（东门）","双榆树","海淀黄庄商圈"],"food":["黄庄一带餐饮","人大西门小吃"],"tip":"4 号线与 12 号线换乘。"},
+"海淀黄庄":{"sights":["中关村创业大街","海淀图书城","黄庄老街"],"food":["创业大街咖啡与简餐","黄庄小吃"],"tip":"4 号线与 10 号线换乘；早晚高峰拥挤。"},
+"国家图书馆":{"sights":["中国国家图书馆","白石桥","紫竹院公园"],"food":["魏公村一带川湘菜","学院路小吃"],"tip":"4/9/16 号线三线换乘，全网大型枢纽之一。"},
+"中关村":{"sights":["中关村广场","创业大街北段","海淀黄庄"],"food":["食宝街各类餐饮","快餐为主"],"tip":"4 号线站，出站即中关村核心区。"},
+"圆明园":{"sights":["圆明园遗址公园","清华大学（西南）"],"food":["清华西门一带餐饮","颐和园方向农家菜"],"tip":"4 号线；步行可达圆明园南门。"},
+"北京大学东门":{"sights":["北京大学东门与校园","中关村"],"food":["燕园食堂与校园周边餐馆"],"tip":"入校需预约，节假日限流。"},
+"动物园":{"sights":["北京动物园","西直门商圈","白石桥"],"food":["烤肉与炸酱面","西直门小吃"],"tip":"4 号线，与 2 号线在西直门换乘；节假日人极多。"},
+"平安里":{"sights":["平安里老街","北海公园（北）","什刹海（西北）"],"food":["卤煮、面茶","护国寺小吃（可步行）"],"tip":"4/6/19 号线三线换乘，枢纽站之一。"},
+"什刹海":{"sights":["什刹海（后海）","银锭桥","烟袋斜街"],"food":["烤肉季、烤肉宛一类老字号","沿湖咖啡与酒吧"],"tip":"8 号线什刹海站；夜生活集中，建议提前订位。"},
+"南锣鼓巷":{"sights":["南锣鼓巷老街","雨儿胡同、帽儿胡同","钟鼓楼（北）"],"food":["老北京小吃与文创小食","咖啡馆众多"],"tip":"6 号线与 8 号线换乘；节假日限流。"},
+"中国美术馆":{"sights":["中国美术馆","五四大街","隆福寺方向"],"food":["王府井方向餐饮"],"tip":"8 号线；美术馆需预约。"},
+"北海北":{"sights":["北海公园","景山公园（西）","什刹海（北）"],"food":["护国寺小吃","什刹海一带小馆"],"tip":"6 号线；出站即北海北门。"},
+"奥林匹克公园":{"sights":["鸟巢、水立方","玲珑塔","奥体中心"],"food":["奥体商圈快餐","盘古一带餐饮"],"tip":"8 号线与 15 号线换乘；赛事日人流管制。"},
+"奥体中心":{"sights":["国家奥体中心","奥林匹克公园"],"food":["北辰一带餐饮"],"tip":"8 号线。"},
+"知春路":{"sights":["知春路商圈","五道口（东）","中关村南"],"food":["知春路餐饮一条街","咖啡与川菜"],"tip":"10 号线与 13 号线换乘。"},
+"大望路":{"sights":["大望路商圈","建国路沿线","百子湾方向"],"food":["商场餐饮层","建国路快餐"],"tip":"1 号线与 14 号线换乘；换乘通道较长。"},
+"国贸":{"sights":["国贸 CBD","中国尊","世贸天阶"],"food":["国贸商城餐饮（菜系齐全）","商务快餐与咖啡"],"tip":"1 号线与 10 号线换乘；早晚高峰限流。"},
+"双井":{"sights":["双井商圈","合生汇","劲松方向"],"food":["合生汇餐饮层（选择最多）"],"tip":"7 号线与 10 号线换乘。"},
+"十里河":{"sights":["十里河古玩市场","潘家园旧货市场（步行可达）"],"food":["潘家园周边小吃","家常菜"],"tip":"10/14/17 号线换乘；周末古玩市场最热闹。"},
+"潘家园":{"sights":["潘家园旧货市场","古玩城"],"food":["市场周边小吃"],"tip":"10 号线站；周末与节假日人多。"},
+"潘家园西":{"sights":["潘家园古玩市场（西侧）"],"food":["市场周边小吃"],"tip":"17 号线站。"},
+"朝阳公园":{"sights":["朝阳公园","蓝色港湾商圈","使馆区"],"food":["蓝色港湾餐饮","使馆区西餐与咖啡"],"tip":"3 号线与 14 号线换乘。"},
+"团结湖":{"sights":["团结湖公园","水碓子","朝阳北路"],"food":["老北京家常菜","水碓子小吃"],"tip":"3 号线与 10 号线换乘。"},
+"呼家楼":{"sights":["央视总部大楼","金台路一带","呼家楼小区"],"food":["写字楼餐饮与便利店"],"tip":"6 号线与 10 号线换乘。"},
+"宋家庄":{"sights":["南三环","石榴庄公园"],"food":["宋家庄一带餐饮","南三环沿线小吃"],"tip":"5/10 号线与亦庄线换乘；出站即京港澳高速侧。"},
+"望京":{"sights":["望京商圈","望京公园","798 艺术区（需转公交）"],"food":["韩餐、川菜、咖啡都很密集"],"tip":"14 号线与 15 号线换乘。"},
+"三元桥":{"sights":["三元桥","亮马河蓝港（步行可达）"],"food":["亮马桥一带的咖啡与西餐"],"tip":"2 号线、10 号线与首都机场线换乘；机场快轨从此进。"},
+"五道口":{"sights":["五道口服装市场","北京语言大学","清华东门（近）"],"food":["韩餐与高校周边便宜餐饮"],"tip":"13 号线站；西北旺方向。"},
+"生命科学园":{"sights":["生命科学园园区","京北高校带"],"food":["园区周边快餐"],"tip":"昌平线站。"},
+"回龙观":{"sights":["回龙观社区","龙泽（东）"],"food":["社区餐饮与连锁快餐"],"tip":"13 号线大居民区站，早晚高峰极挤。"},
+"立水桥":{"sights":["立水桥商圈","天通苑（南）"],"food":["立水桥餐饮密集"],"tip":"5 号线与 13 号线换乘；早高峰限流。"},
+"天通苑北":{"sights":["天通苑社区","太平庄方向"],"food":["社区餐饮"],"tip":"5 号线北端终点站。"},
+"霍营":{"sights":["霍营","龙锦苑居住区"],"food":["社区餐饮"],"tip":"8 号线与 13 号线换乘。"},
+"朱辛庄":{"sights":["朱辛庄","京藏高速侧"],"food":["快餐为主"],"tip":"8 号线与昌平线换乘。"},
+"西二旗":{"sights":["西二旗","回龙观方向"],"food":["社区餐饮"],"tip":"13 号线与昌平线换乘。"},
+"北京西站":{"sights":["北京西站北广场","莲花池公园"],"food":["西站周边餐饮","莲花池一带家常菜"],"tip":"7 号线与 9 号线换乘；进站认准北广场。"},
+"北京南站":{"sights":["北京南站","陶然亭公园（西北）"],"food":["南站餐饮层","鸭子桥方向餐厅"],"tip":"4 号线与 14 号线换乘；候车层餐饮偏贵。"},
+"草桥":{"sights":["草桥","大兴机场线方向"],"food":["草桥一带餐饮"],"tip":"10 号线、19 号线与大兴机场线换乘。"},
+"环球度假区":{"sights":["北京环球度假区"],"food":["园区内餐饮（品类较全）"],"tip":"1 号线与 7 号线换乘；节假日建议提前买票。"},
+"传媒大学":{"sights":["中国传媒大学","通惠河北路"],"food":["传媒大学周边小吃"],"tip":"1 号线东段；入校有参观规定。"},
+"果园":{"sights":["通州城区","运河西大街"],"food":["通州老城区小吃"],"tip":"1 号线东段。"},
+"通州北关":{"sights":["通州北关","大运河森林公园（西）"],"food":["北关一带餐饮"],"tip":"6 号线东段；近大运河。"},
+"北运河西":{"sights":["京杭大运河河道","运河西大街"],"food":["运河边小吃"],"tip":"6 号线；滨河步道适合散步。"},
+"燕山":{"sights":["燕山城关","房山地区"],"food":["燕山一带家常菜"],"tip":"燕房线终点站；进山需转公交。"},
+"良乡大学城":{"sights":["良乡大学城（多所高校）","房山城区"],"food":["大学城平价小吃多"],"tip":"房山线；学生多，小吃便宜。"},
+"亦庄文化园":{"sights":["亦庄文化园","南海子公园"],"food":["亦庄一带餐饮"],"tip":"亦庄线站。"},
+"次渠":{"sights":["次渠","亦庄"],"food":["次渠商圈餐饮"],"tip":"亦庄线与 17 号线换乘。"},
+"香山":{"sights":["香山公园","碧云寺"],"food":["山脚下农家菜","登顶建议自带干粮"],"tip":"西郊线终点；周末人多，建议早班。"},
+"颐和园西门":{"sights":["颐和园","西山"],"food":["宫门前餐饮"],"tip":"西郊线；入园需门票。"},
+"十三陵景区":{"sights":["明十三陵","定陵、昭陵"],"food":["景区外餐饮"],"tip":"昌平线；景区跨度大，建议坐摆渡。"},
+"古城":{"sights":["古城公园","八宝山"],"food":["老北京小吃"],"tip":"1 号线西段。"},
+"五棵松":{"sights":["五棵松体育馆","华熙LIVE"],"food":["华熙LIVE 餐饮密集"],"tip":"1 号线；演唱会日交通管制。"},
+"苹果园":{"sights":["苹果园","石景山游乐园方向"],"food":["苹果园一带家常菜"],"tip":"1 号线西端起点，与 S1 线换乘。"},
+"牡丹园":{"sights":["牡丹园","北太平庄","邮电大学"],"food":["牡丹园商场餐饮"],"tip":"10 号线与 19 号线换乘。"},
+"北太平庄":{"sights":["北太平庄","西土城"],"food":["西土城小吃"],"tip":"10 号线与 19 号线换乘。"},
+"苏州街":{"sights":["苏州街商圈","颐和园北"],"food":["苏州街咖啡与简餐"],"tip":"10 号线站；离颐和园北门不远。"},
+"车道沟":{"sights":["紫竹院","中央电视台"],"food":["车道沟一带餐饮"],"tip":"10 号线站。"},
+"长春桥":{"sights":["世纪金源购物中心","长春桥西"],"food":["世纪金源餐饮层（选择极多）"],"tip":"10 号线与 12 号线换乘。"},
+/* —— 南京 —— */
+"新街口":{"sights":["新街口商圈","德基广场","中山路"],"food":["鸭血粉丝汤","盐水鸭","蟹黄汤包、老字号点心"],"tip":"1 号线与 2 号线换乘；市中心最繁华口，周末限流。"},
+"大行宫":{"sights":["总统府","大行宫老城","南京博物院（东）"],"food":["民国风小吃","狮子桥小吃可步行"],"tip":"2 号线与 3 号线换乘；总统府需预约。"},
+"夫子庙":{"sights":["秦淮风光带","文德桥","老门东"],"food":["鸭血粉丝汤","牛肉锅贴","蟹黄汤包","盐水鸭"],"tip":"3 号线与 5 号线换乘；晚间灯火人流高峰。"},
+"南京站":{"sights":["南京站","玄武湖（东北）","新模范马路"],"food":["站前小吃","湖南路方向餐厅"],"tip":"1 号线与 3 号线换乘；市中心北门户。"},
+"南京南站":{"sights":["南京南站","雨花客厅","大报恩寺遗址公园（近）"],"food":["南站餐饮层","雨花台方向小吃"],"tip":"1/3/S1/10 号线四线换乘，全网最大枢纽之一。"},
+"明故宫":{"sights":["明故宫遗址公园","午朝门公园","中山门"],"food":["明故宫一带快餐","附近居民区餐饮"],"tip":"2 号线与 6 号线换乘；公园适合散步。"},
+"苜蓿园":{"sights":["中山陵景区（东）","明城墙","下马坊遗址"],"food":["苜蓿园市井小吃","烤鸭"],"tip":"2 号线；中山陵需另行购票步行。"},
+"孝陵卫":{"sights":["中山陵","灵谷寺","美龄宫"],"food":["景区周边餐饮（景区价）"],"tip":"2 号线；景区建议安排半天以上。"},
+"马群":{"sights":["钟山风景区","紫金山（东）"],"food":["马群一带餐饮"],"tip":"2 号线与 S6 号线换乘。"},
+"奥体东":{"sights":["南京奥体中心","河西新城"],"food":["奥体商圈餐饮"],"tip":"2 号线站；河西 CBD 一带。"},
+"鼓楼":{"sights":["鼓楼","湖南路美食街","中山陵（东）"],"food":["湖南路老字号小吃","南京大牌档一类本地菜"],"tip":"1 号线与 4 号线换乘；湖南路是学生美食街。"},
+"云南路":{"sights":["云南路美食街","南京大学鼓楼校区","古鸡鸣寺方向"],"food":["老南京面馆、小笼包、鸭血粉丝汤"],"tip":"4 号线与 5 号线换乘。"},
+"鸡鸣寺":{"sights":["古鸡鸣寺","南京大学","玄武湖（东南）"],"food":["南大周边小吃","斋面素食"],"tip":"3 号线与 4 号线换乘；寺内有台阶，雨雪天注意。"},
+"玄武门":{"sights":["玄武湖公园","鸡鸣寺","台城"],"food":["玄武湖周边简餐"],"tip":"1 号线站；玄武湖免费开放。"},
+"莫愁湖":{"sights":["莫愁湖公园","水西门","朝天宫（近）"],"food":["湖边小吃","朝天宫一带家常菜"],"tip":"2 号线与 7 号线换乘；夏季荷花季人极多。"},
+"清凉山":{"sights":["清凉山公园","扫叶楼","石头城遗址"],"food":["石头城一带小吃"],"tip":"7 号线；公园免费，傍晚爬山看落日。"},
+"燕子矶":{"sights":["燕子矶","长江观景台","对岸幕府山"],"food":["江边小馆"],"tip":"1 号线北段；江风大注意保暖。"},
+"栖霞山":{"sights":["栖霞山风景区","栖霞寺","红叶观赏区"],"food":["景区外农家菜"],"tip":"6 号线终点；红叶季极挤，建议早班。"},
+"江心洲":{"sights":["江心洲湿地","绿博园","长江大桥"],"food":["江边农家菜","洲上烧烤"],"tip":"10 号线站；周末骑行首选。"},
+"绿博园":{"sights":["绿博园","南京眼","江心洲"],"food":["园内简餐"],"tip":"10 号线；园艺主题园，适合亲子。"},
+"九龙湖":{"sights":["九龙湖公园","东南大学九龙湖校区"],"food":["大学城餐饮","湖边咖啡"],"tip":"3 号线站。"},
+"东大九龙湖校区":{"sights":["东南大学九龙湖校区","九龙湖公园"],"food":["食堂与校园周边"],"tip":"3 号线区段站。"},
+"泰山新村":{"sights":["泰山新村","浦口老城","江北片区"],"food":["浦口一带本地面食：老卤面、锅盖面"],"tip":"S8 线站；出站即生活区。"},
+"方州广场":{"sights":["方州广场公园","浦口区行政中心"],"food":["广场周边餐饮"],"tip":"S8 线站。"},
+"南京工业大学":{"sights":["南京工业大学","江浦珠江镇"],"food":["江浦小吃","大学城商业街"],"tip":"10 号线站。"},
+"红山新城":{"sights":["红山森林动物园（近）","红山新城公园"],"food":["新城商业配套餐饮"],"tip":"6 号线站。"},
+"五塘广场":{"sights":["五塘广场","幕府山（南）"],"food":["广场周边小吃"],"tip":"3 号线与 7 号线换乘。"},
+"幕府山":{"sights":["幕府山风景区","燕子矶（东）"],"food":["山脚下餐饮"],"tip":"7 号线站；可观长江大桥与南京城景。"}
+};
+/* 文字线：同一个字累计吃到第 CARD_AT 次时的卡片 */
+var CHAR_CARDS={
+"7":{"sights":["谐音梗自带的一站：吉祥数","连着吃到 N 个 7，运气条拉满"],"food":["数字 7 在很多文化里代表「完整与循环」"],"tip":"7 本身不是车站，是这条蛇的「口味」。"},
+"苏":{"sights":["「苏」= 复苏、苏醒","苏式面点里的甜咸两面"],"food":["苏式汤面、鲜肉月饼"],"tip":"文字版的卡片：吃到同一个字 N 次就解锁这条。"},
+"络":{"sights":["「络」= 网络、经络，连接之意","蛇身本来就是一条「络」"],"food":["糖醋里脊配米饭（家常味）"],"tip":"文字版的卡片：吃到同一个字 N 次就解锁这条。"}
+};
+
 /* 食物构造的统一入口：引擎只认它，内部转发给当前模式模块 */
 function mkFood(x,y,value,forceName){ return MODE.mkFood(x,y,value,forceName); }
 
@@ -449,6 +648,21 @@ var homeLineRows=null, hpCountEl=null, lineHiTimer=null, lineHiIdx=-1;
 const boardEl=document.getElementById("board");
 const startOverlay=document.getElementById("startOverlay"), pauseOverlay=document.getElementById("pauseOverlay"), deadOverlay=document.getElementById("deadOverlay");
 const pauseScoreEl=document.getElementById("pauseScore"), finalScoreEl=document.getElementById("finalScore"), killerNameEl=document.getElementById("killerName");
+/* 站点卡片 / 图鉴（机制②）：声明与赋值必须放在这里，不能放到后面的模块段落里，
+   否则后面的 var 初始化会把引用冲成 null（严格模式下更是直接报错）。 */
+var cardLayerEl=document.getElementById("cardLayer");
+var galleryEl=document.getElementById("cardGallery");
+var galListEl=document.getElementById("galList");
+var galSubEl=document.getElementById("galSub");
+var cardCountEl=document.getElementById("cardCount");
+(function(){
+  var gc=document.getElementById("galClose");
+  if(gc) gc.onclick=function(){ galleryEl.classList.add("hidden"); };
+  var cc=document.getElementById("cardCount");
+  if(cc) cc.onclick=openGallery;
+  var gb=document.getElementById("galBtn");
+  if(gb) gb.onclick=openGallery;
+})();
 
 /* ===== 状态 ===== */
 let VCOLS=21, VROWS=21, CELL=30, VW=630, VH=630;   // 视口列/行数 + 画布像素尺寸
@@ -512,21 +726,147 @@ if(window.visualViewport){
 }
 
 /* ===== 初始化 ===== */
+/* ===== 机制①：空间秩序（防拥挤）===== */
+var dens=new Int16Array(DN*DN);       // 每个分区的蛇身节数
+var zoneFood=new Int16Array(DN*DN);   // 每个分区的豆子数
+function zoneOf(x,y){ return (((y/DN)|0)%DN)*DN + (((x/DN)|0)%DN); }
+/* 每拍刷新密度网格：一次性扫过所有蛇身（几十条蛇也就几百次），非常便宜 */
+function buildDensity(){
+  var i,j;
+  for(i=0;i<dens.length;i++) dens[i]=0;
+  for(i=0;i<snakes.length;i++){ var sn=snakes[i];
+    if(!sn.alive||!sn.body.length) continue;
+    for(j=0;j<sn.body.length;j++) dens[zoneOf(sn.body[j].x,sn.body[j].y)]++;
+  }
+}
+/* 某格周围 3×3 分区里的蛇身总节数 —— 就是「这儿有多挤」 */
+function crowdAt(x,y){
+  var bx=(x/DN)|0, by=(y/DN)|0, s=0, dx, dy;
+  for(dy=-1;dy<=1;dy++) for(dx=-1;dx<=1;dx++)
+    s+=dens[(((by+dy+DN)%DN)*DN)+((bx+dx+DN)%DN)];
+  return s;
+}
+function headList(){
+  var a=[],i;
+  for(i=0;i<snakes.length;i++){ var sn=snakes[i];
+    if(sn.alive&&sn.body.length) a.push({x:sn.body[0].x,y:sn.body[0].y,sn:sn}); }
+  return a;
+}
+/* 环形地图上的两点距离（走最近的那条路） */
+function torDist(a,b){
+  var dx=Math.abs(a.x-b.x), dy=Math.abs(a.y-b.y);
+  if(dx>WCOLS/2) dx=WCOLS-dx;
+  if(dy>WROWS/2) dy=WROWS-dy;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+function nearestHead(c,heads){
+  var m=99,i;
+  for(i=0;i<heads.length;i++){ var d=torDist(c,heads[i]); if(d<m)m=d; }
+  return m;
+}
+/* 分散选点：随机采样若干次，取「离所有蛇最远」的那个格子。
+   开局放蛇、补豆子都靠它 —— 纯随机会把蛇和豆子丢到同一个角落。 */
+function pickSpreadCell(occ,heads){
+  var best=null, bs=-1, i;
+  for(i=0;i<SPREAD_SAMPLES;i++){
+    var c={x:rnd(WCOLS),y:rnd(WROWS)};
+    if(occ && occ[c.x+","+c.y]) continue;
+    var d=nearestHead(c,heads);
+    if(d>bs){ bs=d; best=c; }
+  }
+  if(best) return best;
+  for(i=0;i<80;i++){ var c2={x:rnd(WCOLS),y:rnd(WROWS)}; if(!occ||!occ[c2.x+","+c2.y]) return c2; }
+  return {x:rnd(WCOLS),y:rnd(WROWS)};
+}
+/* 豆子落点：先挑一个「豆子还不满」的分区，再在分区内取一个不挨着蛇嘴的点。
+   豆子铺得开 → 蛇自然跟着铺开，而不是全挤在同一片豆子上。 */
+function pickFoodCell(occ,heads){
+  var i, bestZ=-1, load=1e9;
+  for(i=0;i<8;i++){
+    var z=rnd(DN*DN);
+    if(zoneFood[z]<ZONE_CAP && zoneFood[z]<load){ load=zoneFood[z]; bestZ=z; if(load<ZONE_SOFT) break; }
+  }
+  if(bestZ>=0){
+    var bx=(bestZ%DN)*DN, by=((bestZ/DN)|0)*DN;
+    for(i=0;i<20;i++){
+      var t={x:(bx+rnd(DN))%WCOLS, y:(by+rnd(DN))%WROWS};
+      if(occ[t.x+","+t.y]) continue;
+      if(nearestHead(t,heads)<2) continue;      // 别塞到某条蛇嘴边上
+      return t;
+    }
+  }
+  return pickSpreadCell(occ,heads);
+}
+function recountZones(){
+  var i;
+  for(i=0;i<zoneFood.length;i++) zoneFood[i]=0;
+  for(i=0;i<food.length;i++) zoneFood[zoneOf(food[i].x,food[i].y)]++;
+}
+/* 找一个「豆子还不多」的分区里的格子：先在附近找，附近满了就去全图找空区。
+   必须有全图兜底 —— 局部挪动在「整片都饱和」时会越挪越挤，等于没挪。 */
+function pickUnderCapCell(nx,ny){
+  var best=null, bs=1e9, i, c, z, s;
+  for(i=0;i<14;i++){
+    c={x:(nx+rnd(13)-6+WCOLS)%WCOLS, y:(ny+rnd(13)-6+WROWS)%WROWS};
+    z=zoneOf(c.x,c.y);
+    if(zoneFood[z]>=ZONE_HARD) continue;
+    s=torDist(c,{x:nx,y:ny}) + zoneFood[z]*0.35;       // 同等条件下偏好更空的区
+    if(s<bs){ bs=s; best=c; }
+  }
+  if(best) return best;
+  for(i=0;i<24;i++){                                   // 附近全满 → 全图找空区
+    c={x:rnd(WCOLS),y:rnd(WROWS)};
+    if(zoneFood[zoneOf(c.x,c.y)]<ZONE_SOFT) return c;
+  }
+  return {x:rnd(WCOLS),y:rnd(WROWS)};
+}
+/* 往地图里放豆子的唯一入口。
+   硬约束：任何分区的豆子数都不许超过 ZONE_HARD，超了立刻把这颗挪到空区。
+   为什么必须这样：一条蛇撞死会一次性掉几十颗肉，全都落在它倒下的地方，
+   那个区瞬间变成磁铁，把周围所有蛇都吸过来互撞 —— 正是要避免的「人堆」。 */
+function pushFood(x,y,value,forceName){
+  var z=zoneOf(x,y);
+  if(!forceName && zoneFood[z]>=ZONE_HARD){
+    var c=pickUnderCapCell(x,y);
+    x=c.x; y=c.y; z=zoneOf(x,y);
+  }
+  food.push(mkFood(x,y,value,forceName));
+  zoneFood[z]++;
+}
+function spawnFood(n){
+  var occ=occSet(), heads=headList(), i;
+  recountZones();
+  for(i=0;i<n;i++){
+    var c=pickFoodCell(occ,heads);
+    occ[c.x+","+c.y]=1;
+    pushFood(c.x,c.y,1);
+  }
+}
+/* 豆子再平衡：把「挤爆的分区」里、而且此刻没人正对着吃的豆子搬到空区。
+   等于持续削掉「人堆 + 豆堆」这种磁铁组合。
+   ⚠ 必须先 recountZones()：蛇掉肉、撞死都会直接把豆子塞进数组，
+   不重算就会拿着过期的分区计数，导致长跑后某个分区堆到 20 个豆。 */
+function rebalanceFood(){
+  recountZones();
+  var budget=0, z;
+  for(z=0;z<zoneFood.length;z++) if(zoneFood[z]>ZONE_CAP) budget+=(zoneFood[z]-ZONE_CAP);
+  budget=Math.min(budget,8);          // 每 FOOD_REBALANCE 拍最多搬 8 个，搬太猛会让人看见豆子凭空挪动
+  if(budget<=0) return;
+  var heads=headList(), moved=0, i;
+  for(i=food.length-1;i>=0 && moved<budget;i--){
+    var f=food[i], zi=zoneOf(f.x,f.y);
+    if(zoneFood[zi]<=ZONE_CAP) continue;
+    if(nearestHead(f,heads)<CROWD_R) continue;    // 谁正对着它就先留着
+    zoneFood[zi]--; food.splice(i,1); moved++;
+  }
+  if(moved) spawnFood(moved);
+}
 function occSet(){
   var s={};
   for(var i=0;i<snakes.length;i++){ var sn=snakes[i];
     if(!sn.alive) continue;
     for(var j=0;j<sn.body.length;j++) s[sn.body[j].x+","+sn.body[j].y]=1; }
   return s;
-}
-function spawnFood(n){
-  var occ=occSet();
-  for(var i=0;i<n;i++){
-    var c,g=0;
-    do{ c={x:rnd(WCOLS),y:rnd(WROWS)}; g++; }while(occ[c.x+","+c.y]&&g<60);
-    occ[c.x+","+c.y]=1;
-    food.push(mkFood(c.x,c.y,1));
-  }
 }
 /* 地铁版：保证玩家「下一站」在地图上至少有一个。
    否则玩家根本不知道该去找哪个站，「按真实站序收集本线站点」的记忆目的就落空了。 */
@@ -537,22 +877,34 @@ function ensureNextStation(){
   if(idx>=st.length) return;
   var want=st[idx], i;
   for(i=0;i<food.length;i++) if(food[i].name===want) return;   // 已存在，不用补
-  var occ=occSet(), c, g=0, h=player.body[0];
-  do{ c={x:(h.x+rnd(11)-5+WCOLS)%WCOLS, y:(h.y+rnd(11)-5+WROWS)%WROWS}; g++; }while(occ[c.x+","+c.y]&&g<80);
-  food.push(mkFood(c.x,c.y,1,want));
+  var occ=occSet(), h=player.body[0], g=0, c=null;
+  recountZones();
+  for(g=0;g<90 && !c;g++){
+    var rad=(g<60?5:10);                    // 先找附近，附近不行再放宽
+    var t={x:(h.x+rnd(rad*2+1)-rad+WCOLS)%WCOLS, y:(h.y+rnd(rad*2+1)-rad+WROWS)%WROWS};
+    if(occ[t.x+","+t.y]) continue;
+    // 尽量落在还不拥挤的分区，否则「下一站」本身又会变成一个豆子堆
+    if(zoneFood[zoneOf(t.x,t.y)]>=ZONE_HARD-2) continue;
+    c=t;
+  }
+  if(!c) c=pickUnderCapCell(h.x,h.y);
+  pushFood(c.x,c.y,1,want);   // forceName=站名：不能被挪走，必须落在玩家附近
 }
 function spawnSnake(o){
   var len=o.len||START_LEN;
-  var h={x:rnd(WCOLS),y:rnd(WROWS)};
+  // 开局分散：取「离所有已存在蛇最远」的格子当蛇头，避免一开局就叠成一团
+  var heads=headList();
+  var h = heads.length ? pickSpreadCell(null,heads) : {x:rnd(WCOLS),y:rnd(WROWS)};
   var d=o.dir||{x:1,y:0}, body=[];
   for(var i=0;i<len;i++) body.push({x:(h.x-d.x*i+WCOLS)%WCOLS, y:(h.y-d.y*i+WROWS)%WROWS});
   return {id:o.id,name:o.name,color:o.color,isPlayer:!!o.isPlayer,alive:true,
     body:body, prev:body.map(function(c){return {x:c.x,y:c.y};}), dir:d, nextDir:d,
     score:len, boosting:false, respawnAt:0, hitCd:0, bc:0,
-    homeLine:null, nextHomeIdx:0, homeGlow:0};
+    homeLine:null, nextHomeIdx:0, homeGlow:0, squeezeUntil:0};
 }
 function reset(){
   food=[]; snakes=[]; tickCount=0;
+  dens.fill(0); zoneFood.fill(0);
   var pd=MODE.playerDef();
   player=spawnSnake({id:0,name:pd.name,color:pd.color,isPlayer:true});
   player.homeLine=MODE.homeLineFor(0,true);
@@ -568,10 +920,47 @@ function reset(){
 }
 
 /* ===== AI ===== */
+/* 方向打分：三个力在拔河 —— ①别撞身（硬约束）②别挤进人群 ③尽快够到目标。
+   crowdAt 读的是本拍刷新的分区密度，所以「个人空间」这一项是真的会生效。 */
+function steerScore(sn,o,target,occ,heads){
+  var h=sn.body[0], q;
+  var nx=(h.x+o.x+WCOLS)%WCOLS, ny=(h.y+o.y+WROWS)%WCOLS;
+  var s = (occ && occ[nx+","+ny]) ? -1000 : 0;      // ① 别撞身
+  s -= CROWD_W*crowdAt(nx,ny);                        // ② 本格周围太挤
+  var ax=(h.x+o.x*2+WCOLS)%WCOLS, ay=(h.y+o.y*2+WROWS)%WROWS;
+  s -= CROWD_W*0.7*crowdAt(ax,ay);                    //    前方两格也挤 → 别硬钻
+  for(q=0;q<heads.length;q++){                        //    别贴着别人的蛇头挤
+    var hh=heads[q]; if(hh.sn===sn) continue;
+    var dx=rel(hh.x,nx,WCOLS), dy=rel(hh.y,ny,WROWS), d2=dx*dx+dy*dy;
+    if(d2<9) s -= (9-d2)*1.8;                          //    3 格内有头 → 强排斥
+  }
+  if(target){                                          // ③ 目标吸引
+    var ex=rel(target.x,nx,WCOLS), ey=rel(target.y,ny,WROWS);
+    s -= Math.sqrt(ex*ex+ey*ey);
+  }
+  return s;
+}
+/* 四向选优；三个方向都被身子占住 → 进入「挤」状态（短时间内免罚），
+   这样被人围住不会变成必死局，而是挤出去。 */
+function steer(sn,target,occ,heads,allowRetreat){
+  var all=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}], opts=[], i, s2;
+  for(i=0;i<all.length;i++){
+    if(!allowRetreat && all[i].x===-sn.dir.x && all[i].y===-sn.dir.y) continue;   // 不原地掉头
+    opts.push(all[i]);
+  }
+  var pick=null, pd=-1e9;
+  for(i=0;i<opts.length;i++){ s2=steerScore(sn,opts[i],target,occ,heads); if(s2>pd){pd=s2;pick=opts[i];} }
+  if(pd<=-1000){        // 四面都是身子：挑最空的方向硬挤，并申请免罚
+    pick=null; pd=-1e9;
+    for(i=0;i<opts.length;i++){ s2=steerScore(sn,opts[i],target,null,heads); if(s2>pd){pd=s2;pick=opts[i];} }
+    sn.squeezeUntil=tickCount+SQUEEZE_TICKS;
+  }
+  return pick||opts[0];
+}
 function botThink(sn){
   // 迟钝：每 BOT_DECIDE 拍才重新想一次，其余时间直行（会错过转弯、绕远路）
   if(tickCount % BOT_DECIDE !== 0) return;
-  var h=sn.body[0], i;
+  var h=sn.body[0], i, k;
   var bestF=null, bestS=-1;
   for(i=0;i<food.length;i++){
     var f=food[i];
@@ -581,21 +970,14 @@ function botThink(sn){
     var sc=(f.value*4)/d;
     if(sc>bestS){bestS=sc;bestF=f;}
   }
-  var all=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
-  var opts=all.filter(function(o){return !(o.x===-sn.dir.x&&o.y===-sn.dir.y);});
   // 失误：小概率乱转，不再精准追豆
-  if(Math.random()<BOT_MISS){ sn.nextDir=opts[rnd(opts.length)]; return; }
-  var occ=occSet();
-  var pick=null, pd=-1e9;
-  for(i=0;i<opts.length;i++){
-    var o=opts[i];
-    var nx=(h.x+o.x+WCOLS)%WCOLS, ny=(h.y+o.y+WROWS)%WROWS;
-    var s2 = occ[nx+","+ny] ? -1000 : 0;
-    if(bestF){ var ex=rel(bestF.x,nx,WCOLS), ey=rel(bestF.y,ny,WROWS); s2 -= Math.sqrt(ex*ex+ey*ey); }
-    else s2 += Math.random();
-    if(s2>pd){pd=s2;pick=o;}
+  if(Math.random()<BOT_MISS){
+    var any=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}], opts=[];
+    for(k=0;k<any.length;k++) if(!(any[k].x===-sn.dir.x&&any[k].y===-sn.dir.y)) opts.push(any[k]);
+    sn.nextDir=opts[rnd(opts.length)];
+    return;
   }
-  sn.nextDir=pick||opts[0];
+  sn.nextDir=steer(sn,bestF,occSet(),headList(),false);
 }
 
 /* 托管：给玩家蛇用的 AI —— 每拍决策、全图视野、不失误，比对手聪明 */
@@ -609,19 +991,7 @@ function autoThink(sn){
     var sc=(f.value*4)/d;                 // 大豆子优先
     if(sc>bestS){bestS=sc;bestF=f;}
   }
-  var opts=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}]
-    .filter(function(o){return !(o.x===-sn.dir.x&&o.y===-sn.dir.y);});
-  var occ=occSet();
-  var pick=null, pd=-1e9;
-  for(i=0;i<opts.length;i++){
-    var o=opts[i];
-    var nx=(h.x+o.x+WCOLS)%WCOLS, ny=(h.y+o.y+WROWS)%WROWS;
-    var s2 = occ[nx+","+ny] ? -1000 : 0;  // 不往别人（或自己）身上撞
-    if(bestF){ var ex=rel(bestF.x,nx,WCOLS), ey=rel(bestF.y,ny,WROWS); s2 -= Math.sqrt(ex*ex+ey*ey); }
-    else s2 += Math.random();
-    if(s2>pd){pd=s2;pick=o;}
-  }
-  sn.nextDir=pick||opts[0];
+  sn.nextDir=steer(sn,bestF,occSet(),headList(),false);
 }
 
 /* 地铁版：按真实相邻顺序吃下本线下一站 → 建成家园一节（额外奖励），并高亮 */
@@ -635,17 +1005,158 @@ function tryBuildHome(sn,f){
   }
 }
 
+/* ══════════════ 机制②：站点打卡卡 ══════════════
+   同一个站累计吃掉第 CARD_AT 次，就弹一张卡片，讲这站附近的美食 / 景点 / 换乘。
+   三个刻意设计：
+     · 不打断游戏：卡片是浮层，不暂停、不锁输入，6.5 秒自动收起；
+     · 每站只弹一次：弹过就进图鉴，不会被同一张卡刷屏；
+     · 不虚构信息：只写「品类 + 大致片区」，并标明「公开常识整理、未经实时核实」。 */
+var stationHits={}, cardsGot={}, charHits={}, charCards={};
+var cardTimer=null;
+/* cardLayerEl / galleryEl / galListEl / galSubEl / cardCountEl 已在上方「DOM」段赋值。
+   这里绝不能再赋初值 —— 本段执行得比 DOM 段晚，一赋值就又把引用冲成 null 了。 */
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function lineOfStation(name){
+  for(var i=0;i<THEME.lines.length;i++){
+    var L=THEME.lines[i];
+    if(L.stations.indexOf(name)>=0) return L;
+  }
+  return null;
+}
+/* 组一张车站卡：精选 → 枢纽 → 兜底模板，保证任何站都有话说 */
+function buildStationCard(name){
+  var c=CARDS[name], tr=TRANSFER[name]||[], L=lineOfStation(name);
+  var rows=[], tip="", kicker="";
+  if(c){
+    kicker=(L?L.name+" · ":"")+(tr.length>2?"换乘枢纽":"站点卡");
+    if(c.sights&&c.sights.length) rows.push({label:"附近景点",items:c.sights});
+    if(c.food&&c.food.length)   rows.push({label:"附近美食",items:c.food});
+    tip=c.tip||"";
+  } else if(tr.length>2){
+    kicker="换乘枢纽";
+    rows.push({label:"可换乘线路",items:tr.slice(0,6)});
+    tip="多线换乘的大站，走错线很耽误时间；进站先看方向指示牌。";
+  } else {
+    kicker=(L?L.name:"站点")+" · 站点卡";
+    if(L){
+      var i=L.stations.indexOf(name);
+      rows.push({label:"在本线的位置",items:["第 "+(i+1)+" 站 / 全线 "+L.stations.length+" 站（"+L.stations[0]+" → "+L.stations[L.stations.length-1]+"）"]});
+      if(tr.length>1) rows.push({label:"可换乘",items:tr.slice()});
+    }
+    tip="这一站还没写卡片——先记住它在"+(L?L.name:"这条线")+"上的位置和邻站吧。";
+  }
+  return {name:name,color:(L?L.color:"#1f6f6b"),kicker:kicker,rows:rows,tip:tip,hits:stationHits[name]||CARD_AT};
+}
+/* 文字线的字符卡 */
+function buildCharCard(ch){
+  var c=CHAR_CARDS[ch]||{sights:[],food:[],tip:""};
+  return {name:ch+"　（文字版）",color:THEME.playerColor||"#1f6f6b",
+    kicker:"字符卡 · 同一个字吃到第 "+CARD_AT+" 次",
+    rows:[{label:"这个字",items:c.sights||[]},{label:"延伸",items:c.food||[]}],
+    tip:c.tip||"",hits:charHits[ch]||CARD_AT};
+}
+function showCard(cd){
+  if(!cardLayerEl) return;
+  var h='<div class="card-top"><span class="card-kicker">'+esc(cd.kicker)+'</span>'+
+        '<button class="card-x" aria-label="关闭">×</button></div>'+
+        '<h3 class="card-title"><span class="card-dot" style="background:'+cd.color+'"></span>'+esc(cd.name)+'</h3>';
+  for(var i=0;i<cd.rows.length;i++){
+    var r=cd.rows[i];
+    if(!r.items||!r.items.length) continue;
+    h+='<div class="card-sec"><b>'+esc(r.label)+'</b><ul>';
+    for(var k=0;k<r.items.length;k++) h+='<li>'+esc(r.items[k])+'</li>';
+    h+='</ul></div>';
+  }
+  if(cd.tip) h+='<div class="card-tip">'+esc(cd.tip)+'</div>';
+  h+='<div class="card-src">卡片内容：公开常识整理，未经实时核实 · 仅供趣味引导</div>'+
+     '<i class="card-bar" style="animation-duration:'+CARD_MS+'ms"></i>';
+  var el=document.createElement("div");
+  el.className="card"; el.innerHTML=h;
+  cardLayerEl.appendChild(el);
+  while(cardLayerEl.children && cardLayerEl.children.length>2) cardLayerEl.removeChild(cardLayerEl.firstChild);
+  el.querySelector(".card-x").onclick=closeCard;
+  if(cardTimer) clearTimeout(cardTimer);
+  cardTimer=setTimeout(closeCard, CARD_MS);
+}
+function closeCard(){
+  if(cardTimer){ clearTimeout(cardTimer); cardTimer=null; }
+  if(cardLayerEl) cardLayerEl.innerHTML="";
+}
+/* 吃到车站后的打卡逻辑（只统计玩家自己的蛇） */
+function onStationEaten(sn,f){
+  if(!sn.isPlayer||!f||!f.name) return;
+  stationHits[f.name]=(stationHits[f.name]||0)+1;
+  var n=stationHits[f.name];
+  // 飘字把「还要吃几次出卡」讲明白，否则玩家不知道这个机制存在
+  if(n<CARD_AT) sn.popText = (n===1) ? "打卡 ✓" : ("打卡 "+n+"/"+CARD_AT+" · 再吃一次出卡");
+  sn.popT=12;
+  if(n>=CARD_AT && !cardsGot[f.name]){
+    cardsGot[f.name]=1;
+    var t=sn.body[sn.body.length-1];      // 弹卡奖励：一次性 +2 节
+    sn.body.push({x:t.x,y:t.y}); sn.body.push({x:t.x,y:t.y});
+    sn.popText="站卡 +2"; sn.popT=14;
+    showCard(buildStationCard(f.name));
+  }
+}
+/* 文字线：同一个字吃到第 N 次弹字符卡 */
+function onCharEaten(sn,f){
+  if(!sn.isPlayer||!f||!f.ch) return;
+  charHits[f.ch]=(charHits[f.ch]||0)+1;
+  var n=charHits[f.ch];
+  if(n<CARD_AT) sn.popText = (n===1) ? "打卡 ✓" : ("打卡 "+n+"/"+CARD_AT+" · 再吃一次出卡");
+  sn.popT=12;
+  if(n>=CARD_AT && !charCards[f.ch]){ charCards[f.ch]=1; showCard(buildCharCard(f.ch)); }
+}
+function updateCardCount(){
+  if(!cardCountEl) return;
+  var n=Object.keys(cardsGot).length + Object.keys(charCards).length;
+  cardCountEl.textContent=n;
+  var wrap=document.getElementById("cardWrap");
+  if(wrap) wrap.style.display="";
+  var gb=document.getElementById("galBtn");
+  if(gb) gb.textContent=n?("🗂 站卡图鉴（"+n+"）"):"🗂 站卡图鉴";
+}
+/* 图鉴：已解锁的卡片一览（哪些站还没写卡片，一眼能看出来，方便以后补数据） */
+function openGallery(){
+  if(!galleryEl) return;
+  var names=Object.keys(cardsGot).filter(function(k){return cardsGot[k];});
+  var h="", i;
+  for(i=0;i<names.length;i++){
+    var cd=buildStationCard(names[i]);
+    var first="";
+    for(var q=0;q<cd.rows.length;q++){ if(cd.rows[q].items.length){ first=cd.rows[q].items[0]; break; } }
+    h+='<div class="gal-row"><span class="gal-dot" style="background:'+cd.color+'"></span>'+
+       '<span class="gal-name"><b>'+esc(cd.name)+'</b><span class="gal-meta">'+esc(cd.kicker)+' · 吃到 '+(stationHits[names[i]]||0)+' 次</span>'+
+       '<span class="gal-tip">'+esc(first)+'</span></span></div>';
+  }
+  var chars=Object.keys(charCards);
+  for(i=0;i<chars.length;i++){
+    var cc=buildCharCard(chars[i]);
+    h+='<div class="gal-row"><span class="gal-dot" style="background:'+cc.color+'"></span>'+
+       '<span class="gal-name"><b>'+esc(cc.name)+'</b><span class="gal-meta">字符卡 · 吃到 '+(charHits[chars[i]]||0)+' 次</span>'+
+       '<span class="gal-tip">'+esc(cc.tip)+'</span></span></div>';
+  }
+  galListEl.innerHTML=h || '<div class="gal-empty">还没解锁任何卡片。<br>同一个站累计吃到 '+CARD_AT+' 次就会弹出第一张。</div>';
+  var locked=0;
+  if(MODE.lineBased){ for(var p=0;p<STATION_POOL.length;p++) if(!cardsGot[STATION_POOL[p].name]) locked++; }
+  galSubEl.textContent = names.length+chars.length ? ("已解锁 "+(names.length+chars.length)+" 张"+
+      (locked?("　·　全网还有 "+locked+" 站待写卡片"):"　·　本站卡片已全部解锁")) : "";
+  galleryEl.classList.remove("hidden");
+}
+
 /* ===== 大作战机制 ===== */
 function dropMeat(sn,n){
+  recountZones();
   for(var i=0;i<n && sn.body.length>START_LEN;i++){
     var t=sn.body.pop();
-    food.push(mkFood(t.x,t.y,3));
+    pushFood(t.x,t.y,3);
   }
   sn.score=sn.body.length;
   if(sn.isPlayer){ scoreEl.textContent=sn.score; hitFlash=1; }
 }
 function killSnake(sn,killer){
-  for(var i=0;i<sn.body.length;i++) food.push(mkFood(sn.body[i].x,sn.body[i].y,3));
+  recountZones();
+  for(var i=0;i<sn.body.length;i++) pushFood(sn.body[i].x,sn.body[i].y,3);
   var finalLen=sn.body.length;
   sn.alive=false; sn.body=[]; sn.prev=[]; sn.score=0;
   sn.respawnAt = sn.isPlayer ? 0 : performance.now()+2500;
@@ -667,15 +1178,23 @@ function moveSnake(sn,now){
   sn.dir=sn.nextDir;
   var h=sn.body[0];
   var nh={x:(h.x+sn.dir.x+WCOLS)%WCOLS, y:(h.y+sn.dir.y+WROWS)%WROWS};
+  // 碰撞检测。「尾随豁免」：对方最后一两节这一拍就会腾空，允许跟着钻过去——
+  // 人堆里最常见的事就是顶着彼此身子互撞，这一项能消掉大半这类互害。
   var hit=null, i, j;
   for(i=0;i<snakes.length;i++){
     var o=snakes[i];
     if(o===sn||!o.alive) continue;
-    for(j=0;j<o.body.length;j++){ if(o.body[j].x===nh.x&&o.body[j].y===nh.y){hit=o;break;} }
+    for(j=0;j<o.body.length;j++){
+      if(o.body[j].x===nh.x&&o.body[j].y===nh.y){
+        if(TAIL_SLACK>0 && j>=o.body.length-TAIL_SLACK && o.body.length>4) break;  // 让过
+        hit=o; break;
+      }
+    }
     if(hit) break;
   }
   if(hit){
     if(sn.isPlayer && autoMode) return;      // 托管无敌：只被挡住，不掉肉、不死
+    if(sn.squeezeUntil && tickCount<sn.squeezeUntil) return;   // 被围豁免：只挡，不掉肉也不死
     if(mode==="battle"){ killSnake(sn,hit); return; }
     if(now-sn.hitCd>HIT_CD){ dropMeat(sn,DROP_MEAT); sn.hitCd=now; }
     return;
@@ -685,6 +1204,7 @@ function moveSnake(sn,now){
   for(i=0;i<food.length;i++){ if(food[i].x===nh.x&&food[i].y===nh.y){ate=i;break;} }
   if(ate>=0){
     var f=food[ate]; food.splice(ate,1);
+    zoneFood[zoneOf(f.x,f.y)]--;      // 分区计数同步减一，保持精确（否则配额判断会越来越偏）
     sn.body[0].name=f.name; sn.body[0].line=f.line;     // 蛇身由吃掉的站名组成
     MODE.onEat(sn,f);   // 模式模块：吃到后的附加逻辑（地铁版=按真实站序建设家园）
     for(var k=1;k<f.value;k++){ var t=sn.body[sn.body.length-1]; sn.body.push({x:t.x,y:t.y}); }
@@ -702,7 +1222,8 @@ function moveSnake(sn,now){
     sn.bc=(sn.bc||0)+1;
     if(sn.bc%BOOST_DROP===0){
       var tail=sn.body.pop();
-      food.push(mkFood(tail.x,tail.y,2));
+      recountZones();
+      pushFood(tail.x,tail.y,2);
       sn.score=sn.body.length;
       if(sn.isPlayer) scoreEl.textContent=sn.score;
     }
@@ -711,6 +1232,7 @@ function moveSnake(sn,now){
 function tick(now){
   var i;
   tickCount++;
+  buildDensity();   // 本拍的空间密度：AI 的「个人空间」斥力要读它
   for(i=0;i<snakes.length;i++){
     var sn=snakes[i];
     if(!sn.alive){
@@ -726,6 +1248,8 @@ function tick(now){
   for(i=0;i<snakes.length;i++) moveSnake(snakes[i],now);
   if(player && player.alive && player.boosting) moveSnake(player,now);
   if(food.length<FOOD_TARGET) spawnFood(FOOD_TARGET-food.length);
+  // 每 FOOD_REBALANCE 拍做一次分区再平衡：尸体豆堆在一起时会被摊开
+  if(tickCount%FOOD_REBALANCE===0) rebalanceFood();
   MODE.onTick();   // 模式模块每拍附加逻辑（地铁版=保证「下一站」在地图上）
   updateBoard();
 }
@@ -984,6 +1508,15 @@ function draw(a){
       pts.push({x:sx(ix),y:sy(iy)});
     }
     MODE.drawBody(pts,sn);   // 模式模块负责画这条蛇的身子
+    // 拥挤预警环：这一片蛇身太密时，头顶亮一个脉冲红环 —— 提示「往空处走，别在这里挤」
+    var hb=sn.body[0];
+    if(crowdAt(hb.x,hb.y)>CROWD_RING && pts[0].x>-CELL && pts[0].y>-CELL && pts[0].x<S+CELL && pts[0].y<SH+CELL){
+      ctx.strokeStyle="rgba(200,50,30,"+Math.min(0.85,0.22+crowdAt(hb.x,hb.y)/42).toFixed(2)+")";
+      ctx.lineWidth=Math.max(2,CELL*0.07);
+      ctx.beginPath();
+      ctx.arc(pts[0].x, pts[0].y, CELL*(0.60+0.09*pulse), 0, 6.2832);
+      ctx.stroke();
+    }
     // 头
     var H=pts[0];
     if(H.x>-CELL&&H.y>-CELL&&H.x<S+CELL&&H.y<SH+CELL){
@@ -1006,11 +1539,13 @@ function draw(a){
       ctx.fillStyle=sn.isPlayer?sn.color:"rgba(70,66,60,.85)";
       ctx.fillText(sn.name, H.x, H.y-CELL*0.52);
       MODE.drawHeadLabel(H,sn);   // 模式模块的蛇头附加标注
-      if(sn.isPlayer && sn.homeGlow>0){
+      if(sn.isPlayer && (sn.homeGlow>0 || (sn.popT>0 && sn.popText))){
+        var pmsg = (sn.homeGlow>0) ? "建站+1" : sn.popText;
         ctx.font="bold "+(CELL*0.46)+"px 'STKaiti','KaiTi','楷体',sans-serif";
         ctx.fillStyle="rgba(217,164,65,.98)";
-        ctx.fillText("建站+1", H.x, H.y+CELL*0.60);
-        sn.homeGlow--;
+        ctx.fillText(pmsg, H.x, H.y+CELL*0.60);
+        if(sn.homeGlow>0) sn.homeGlow--;
+        else { sn.popT--; if(sn.popT<=0) sn.popText=""; }
       }
     }
   }
@@ -1425,6 +1960,43 @@ function applyTheme(){
 applyTheme();
 resize(); reset(); setMode("open"); lastTime=performance.now(); draw(0);
 requestAnimationFrame(frame);
+
+/* ===== 无头自检用的只读探针 =====
+   整个脚本包在 IIFE 里，冒烟测试读不到顶层 var；
+   这里显式挂几个「只读快照」到 window，测试就能断言空间秩序和打卡计数。
+   （只读取状态，不提供任何改状态的接口） */
+window.__SNAKE__={
+  heads:function(){ return headList().map(function(h){return {x:h.x,y:h.y,name:h.sn.name,isPlayer:!!h.sn.isPlayer}; }); },
+  minHeadDist:function(){
+    var h=headList(), m=99, i, j;
+    for(i=0;i<h.length;i++) for(j=i+1;j<h.length;j++){ var d=torDist(h[i],h[j]); if(d<m)m=d; }
+    return h.length<2?999:m;
+  },
+  // 直接按 food 数组现算分区分布（而不是读维护中的 zoneFood）——这样断言的是真实分布
+  zoneCounts:function(){
+    var a=[], i;
+    for(i=0;i<DN*DN;i++) a.push(0);
+    for(i=0;i<food.length;i++) a[zoneOf(food[i].x,food[i].y)]++;
+    return a;
+  },
+  crowd:function(){ var h=headList(), a=[],i; for(i=0;i<h.length;i++) a.push(crowdAt(h[i].x,h[i].y)); return a; },
+  hits:function(){ return JSON.parse(JSON.stringify(stationHits)); },
+  cards:function(){ return Object.keys(cardsGot).filter(function(k){return cardsGot[k];}); },
+  curated:function(){ return Object.keys(CARDS); },
+  cardData:function(){ return CARDS; },
+  cardCount:function(){ return Object.keys(cardsGot).length+Object.keys(charCards).length; },
+  foodCount:function(){ return food.length; },
+  snakes:function(){ return snakes.length; },
+  /* —— 以下两个仅供无头自检使用 ——
+     simulateEat 模拟「玩家吃到某站 n 次」，验证 计数→弹卡→图鉴 整条链路；
+     正常游玩不会调用它们。 */
+  simulateEat:function(name,n){
+    var L=lineOfStation(name);
+    for(var i=0;i<(n||1);i++) onStationEaten(player,{name:name,line:L?L.name:"",value:1});
+    return {hits:stationHits[name]||0,cards:Object.keys(cardsGot).length,count:Object.keys(cardsGot).length+Object.keys(charCards).length};
+  },
+  galleryHtml:function(){ openGallery(); var h=galListEl.innerHTML; galleryEl.classList.add("hidden"); return h; }
+};
 })();
 </script>
 </body>
